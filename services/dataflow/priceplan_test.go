@@ -46,6 +46,31 @@ func TestPlan_SequencesAndPrices(t *testing.T) {
 	}
 }
 
+func TestPlan_NightsFromDates(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Tbilisi", "Istanbul"}, Start: "Baku",
+		Mode: "cheapest", Tier: "standard", Currency: "EUR",
+		StartDate: "2026-07-01", ReturnDate: "2026-07-07", // 6 nights
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if res.Nights != 6 {
+		t.Fatalf("total nights should be 6 (dates), got %d", res.Nights)
+	}
+	if len(res.NightsByCity) != 3 {
+		t.Fatalf("expected per-city nights for 3 cities, got %v", res.NightsByCity)
+	}
+	sum := 0
+	for _, n := range res.NightsByCity {
+		sum += n
+	}
+	if sum != 6 {
+		t.Fatalf("per-city nights must sum to total (6), got %d (%v)", sum, res.NightsByCity)
+	}
+}
+
 func TestPlan_OrderGivenSkipsResequence(t *testing.T) {
 	p := newTestPlanner()
 	// A deliberately non-optimal order; with Order supplied it must be preserved.

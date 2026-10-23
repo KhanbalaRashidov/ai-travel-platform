@@ -186,11 +186,6 @@ export default function PlanPage() {
     setPref(v);
     reprice({ mode: v });
   }
-  function changeNights(v: number) {
-    const n = Math.max(1, v);
-    setNights(n);
-    reprice({ nights: n });
-  }
   function changeCurrency(v: string) {
     setCurrency(v);
     reprice({ currency: v });
@@ -240,7 +235,10 @@ export default function PlanPage() {
     ? (plan.legs ?? []).map((l) => ({
         mode: l.mode,
         label: t(`mode.${l.mode}`),
-        price: `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`,
+        price:
+          l.price > 0
+            ? `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`
+            : t("res.transfer"),
       }))
     : [];
 
@@ -258,6 +256,7 @@ export default function PlanPage() {
         cities: plan.order ?? [],
         legs: (plan.legs ?? []).map((l) => ({ from: l.from, to: l.to, mode: l.mode, price: l.price })),
         nights: plan.nights,
+        nights_by_city: plan.nights_by_city,
         currency: plan.currency,
         transport_total: plan.transport,
         hotels_total: plan.hotels,
@@ -359,15 +358,6 @@ export default function PlanPage() {
                 <option value="bus">{t("mode.bus")}</option>
               </Select>
             </Field>
-            <Field label={t("plan.nights")}>
-              <NumberInput
-                type="number"
-                min={1}
-                max={10}
-                value={nights}
-                onChange={(e) => changeNights(Number(e.target.value))}
-              />
-            </Field>
             <Field label={t("plan.currency")}>
               <Select value={currency} onChange={(e) => changeCurrency(e.target.value)}>
                 {CURRENCIES.map((c) => (
@@ -432,7 +422,12 @@ export default function PlanPage() {
                   <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
                 </div>
                 <div className="mt-4">
-                  <RouteTimeline stops={plan.order ?? []} legs={timelineLegs} />
+                  <RouteTimeline
+                    stops={plan.order ?? []}
+                    legs={timelineLegs}
+                    nights={plan.nights_by_city ?? []}
+                    nightLabel={(n) => t("res.nights", { n })}
+                  />
                 </div>
                 {plan.alt_variant && (
                   <p className="mt-4 border-t border-border pt-3 text-xs text-muted">

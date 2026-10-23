@@ -161,6 +161,7 @@ export interface PlanQuote {
   currency: string;
   hotel_stars: number;
   nights: number;
+  nights_by_city?: number[];
   activities_per_night: number;
   estimated: boolean;
   alt_variant?: string;
@@ -206,6 +207,7 @@ export interface ItineraryBrief {
   cities: string[];
   legs: { from: string; to: string; mode: string; price: number }[];
   nights: number;
+  nights_by_city?: number[];
   currency: string;
   transport_total: number;
   hotels_total: number;

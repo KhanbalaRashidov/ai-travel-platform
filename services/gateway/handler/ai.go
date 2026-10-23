@@ -47,6 +47,7 @@ type itineraryReq struct {
 	Cities          []string     `json:"cities"`
 	Legs            []legFactDTO `json:"legs"`
 	Nights          int          `json:"nights"`
+	NightsByCity    []int        `json:"nights_by_city"`
 	Currency        string       `json:"currency"`
 	TransportTotal  float64      `json:"transport_total"`
 	HotelsTotal     float64      `json:"hotels_total"`
@@ -69,7 +70,7 @@ func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 		legs[i] = ai.LegFact{From: l.From, To: l.To, Mode: l.Mode, Price: l.Price}
 	}
 	brief := ai.PlanBrief{
-		Cities: req.Cities, Legs: legs, Nights: req.Nights, Currency: req.Currency,
+		Cities: req.Cities, Legs: legs, Nights: req.Nights, NightsByCity: req.NightsByCity, Currency: req.Currency,
 		TransportTotal: req.TransportTotal, HotelsTotal: req.HotelsTotal,
 		ActivitiesTotal: req.ActivitiesTotal, Total: req.Total,
 	}

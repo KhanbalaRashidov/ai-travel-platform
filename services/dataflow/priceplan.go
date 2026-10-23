@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"time"
 
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
@@ -100,7 +101,8 @@ type PlanResult struct {
 	Total              float64    `json:"total"`
 	Currency           string     `json:"currency"`
 	HotelStars         int        `json:"hotel_stars"`
-	Nights             int        `json:"nights"`
+	Nights             int        `json:"nights"`               // total nights
+	NightsByCity       []int      `json:"nights_by_city"`       // aligned to Order
 	ActivitiesPerNight float64    `json:"activities_per_night"` // display currency
 	Estimated          bool       `json:"estimated"`
 	AltVariant         string     `json:"alt_variant,omitempty"`
@@ -298,7 +300,12 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: q.Price})
 	}
 
-	// Hotels + activities via the estimator.
+	// Nights are driven by the dates (single source of truth): totalNights =
+	// return - depart, split across the cities via AllocateNights. Without dates
+	// we fall back to req.Nights per city.
+	nightsByCity, totalNights := allocateNights(order, req, nights)
+
+	// Hotels + activities via the estimator, using per-city nights.
 	stars := tierStars[req.Tier]
 	if stars == 0 {
 		stars = 4
@@ -312,9 +319,9 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if h.Estimated {
 			anyEstimated = true
 		}
-		hotels = append(hotels, planner.PricedHotel{City: i, Stars: h.Stars, Nights: nights, Nightly: h.Nightly})
+		hotels = append(hotels, planner.PricedHotel{City: i, Stars: h.Stars, Nights: nightsByCity[i], Nightly: h.Nightly})
 	}
-	activitiesEUR := activitiesPerNightEUR * float64(nights) * float64(len(order))
+	activitiesEUR := activitiesPerNightEUR * float64(totalNights)
 	anyEstimated = true // activities are always an estimate
 
 	bd, err := planner.Price(planner.PlanInput{
@@ -332,8 +339,8 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	res := PlanResult{
 		Order: order, Variant: variant, Legs: legs,
 		Transport: bd.Transport, Hotels: bd.Hotels, Activities: bd.Activities, Total: bd.Total,
-		Currency: cur, HotelStars: stars, Nights: nights, ActivitiesPerNight: round2(actPerNightDisp),
-		Estimated: anyEstimated,
+		Currency: cur, HotelStars: stars, Nights: totalNights, NightsByCity: nightsByCity,
+		ActivitiesPerNight: round2(actPerNightDisp), Estimated: anyEstimated,
 	}
 	if altVariant != "" {
 		if c, err := p.conv.Convert(altCostEUR, "EUR", cur); err == nil {
@@ -341,6 +348,36 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		}
 	}
 	return res, nil
+}
+
+// allocateNights derives per-city nights from the trip dates (AllocateNights
+// over total = return - depart); without valid dates it uses fallbackPer each.
+func allocateNights(order []string, req PlanRequest, fallbackPer int) ([]int, int) {
+	n := len(order)
+	if d := nightsBetween(req.StartDate, req.ReturnDate); d > 0 {
+		return planner.AllocateNights(d, n, 1, nil), d
+	}
+	by := make([]int, n)
+	for i := range by {
+		by[i] = fallbackPer
+	}
+	return by, fallbackPer * n
+}
+
+// nightsBetween returns the integer nights between two YYYY-MM-DD dates (0 if
+// unparseable or non-positive).
+func nightsBetween(start, end string) int {
+	const f = "2006-01-02"
+	s, err1 := time.Parse(f, start)
+	e, err2 := time.Parse(f, end)
+	if err1 != nil || err2 != nil {
+		return 0
+	}
+	d := int(e.Sub(s).Hours() / 24)
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 func indexOfFold(list []string, v string) int {
