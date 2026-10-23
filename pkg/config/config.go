@@ -31,6 +31,11 @@ type Config struct {
 	GeminiFallbackModel string
 	AnthropicAPIKey     string
 	AIBudgetUSD         float64
+
+	// PriceSources is the PRICE_SOURCES config (newline list of
+	// "name | tos-note | url-template"); empty disables real fetching and the
+	// platform falls back to the labeled estimate.
+	PriceSources string
 }
 
 // Load reads configuration from the environment, applying sensible dev defaults.
@@ -54,6 +59,7 @@ func Load() Config {
 		GeminiFallbackModel: os.Getenv("GEMINI_FALLBACK_MODEL"),
 		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
 		AIBudgetUSD:         getenvFloat("AI_BUDGET_USD", 100),
+		PriceSources:        os.Getenv("PRICE_SOURCES"),
 	}
 }
 

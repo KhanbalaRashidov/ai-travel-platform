@@ -43,14 +43,15 @@ func conv() Converter { return staticConv{r: map[string]float64{"EUR": 1, "USD":
 // --- source ----------------------------------------------------------------
 
 func TestHTTPSource_BlockedIsSkipped(t *testing.T) {
-	s := NewHTTPSource("blocked", "test", func(LegQuery) string { return "http://x" }, stubDoer{status: 403, body: "nope"})
+	s := NewHTTPSource("blocked", "test", func(LegQuery) string { return "http://x" }, NewHTTPRenderer(stubDoer{status: 403, body: "nope"}), nil)
 	if _, _, err := s.Fetch(context.Background(), LegQuery{}); err == nil {
 		t.Fatal("403 must yield ErrUnavailable so the source is skipped")
 	}
 }
 
 func TestHTTPSource_OKReturnsBody(t *testing.T) {
-	s := NewHTTPSource("ok", "test", func(LegQuery) string { return "http://x" }, stubDoer{status: 200, body: "price 120 EUR"})
+	long := "Cheapest flight from Baku to Tbilisi today is 120 EUR one way, book direct. " + strings.Repeat("info ", 150)
+	s := NewHTTPSource("ok", "test", func(LegQuery) string { return "http://x" }, NewHTTPRenderer(stubDoer{status: 200, body: long}), nil)
 	raw, _, err := s.Fetch(context.Background(), LegQuery{})
 	if err != nil || !strings.Contains(raw, "120") {
 		t.Fatalf("expected body, got raw=%q err=%v", raw, err)
@@ -75,7 +76,9 @@ func TestVerbatim(t *testing.T) {
 // --- resolver end-to-end ----------------------------------------------------
 
 func fakeSource(name, body string) PriceSource {
-	return NewHTTPSource(name, "test-only, public fixture", func(LegQuery) string { return "http://x/" + name }, stubDoer{status: 200, body: body})
+	// Pad so the body passes the looksEmpty heuristic (real pages are large).
+	padded := body + " " + strings.Repeat("detail ", 120)
+	return NewHTTPSource(name, "test-only, public fixture", func(LegQuery) string { return "http://x/" + name }, NewHTTPRenderer(stubDoer{status: 200, body: padded}), nil)
 }
 
 func TestResolver_ExtractGuardCompare(t *testing.T) {

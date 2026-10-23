@@ -26,7 +26,7 @@ import (
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
 // aiPrimary/aiBulk are nil when the Anthropic key is not configured.
-func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM) *fiber.App {
+func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM, priceSources string) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "ai-travel-gateway"})
 	app.Use(recover.New(), logger.New(), cors.New())
 	app.Use(tenant.Middleware(defaultTenantID))
@@ -58,10 +58,13 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 		"EUR": 1, "USD": 0.92, "AZN": 0.53, "TRY": 0.028, "RUB": 0.010, "GBP": 1.17,
 	}}
 	placesClient := places.New(nil)
-	// Real multi-source fare resolver. No sources are enabled by default (ToS-safe
-	// + token-less): the planner then falls back to the labeled estimate. Add a
-	// ToS-vetted pricefetch.PriceSource here to turn on real fetched prices.
-	fares := pricefetch.NewResolver(nil, aiPrimary, conv, kv, 0)
+	// Real multi-source fare resolver, driven by the PRICE_SOURCES config. HTTP
+	// first; a headless renderer is linked only in the `-tags headless` build
+	// (NewHeadless returns nil otherwise). Blocked/empty sources are skipped and
+	// the planner falls back to the labeled estimate. The verbatim guardrail
+	// ensures the LLM can only report prices present in the fetched page.
+	priceSrcs := pricefetch.SourcesFromSpec(priceSources, pricefetch.NewHTTPRenderer(nil), pricefetch.NewHeadless())
+	fares := pricefetch.NewResolver(priceSrcs, aiPrimary, conv, kv, 0)
 	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.

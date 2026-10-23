@@ -48,7 +48,7 @@ func main() {
 
 	aiPrimary, aiBulk := buildLLMs(cfg)
 
-	app := buildApp(pool, rdb, jwtMgr, defaultTenantID, aiPrimary, aiBulk)
+	app := buildApp(pool, rdb, jwtMgr, defaultTenantID, aiPrimary, aiBulk, cfg.PriceSources)
 
 	log.Printf("gateway listening on :%s (env=%s)", cfg.Port, cfg.AppEnv)
 	if err := app.Listen(":" + cfg.Port); err != nil {

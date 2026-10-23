@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 )
 
-// realisticUA is a normal desktop browser UA. We identify as a browser because
-// we fetch the same public pages a user would; we do NOT rotate identities or
-// bypass challenges — a source that blocks us is skipped, never defeated.
+// realisticUA is a normal desktop browser UA. We fetch the same public pages a
+// user would and identify as a browser; we do NOT rotate identities, solve
+// CAPTCHAs, or otherwise defeat bot-detection — a blocked source is skipped.
 const realisticUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
 
 // HTTPDoer is the subset of *http.Client used here, so tests inject a fake.
@@ -20,32 +21,74 @@ type HTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// PriceSource fetches a public page likely to contain a price for a leg.
-type PriceSource interface {
-	Name() string
-	// ToS returns a short, honest note on the source's terms/scraping risk.
-	ToS() string
-	// Fetch returns the page text + its URL, or ErrUnavailable to be skipped.
-	Fetch(ctx context.Context, q LegQuery) (raw string, url string, err error)
+// Renderer fetches a URL and returns the page text. HTTPRenderer does a plain
+// GET; a headless (Playwright/Chromium) renderer implements the same interface
+// to run JS-rendered pages. Both are injectable, so the pipeline is testable.
+type Renderer interface {
+	Render(ctx context.Context, url string) (body string, status int, err error)
 }
 
-// HTTPSource is a generic, configurable source: a URL builder + a realistic UA.
-// Anti-bot responses (401/403/429) and other non-2xx are treated as
-// ErrUnavailable so the resolver skips the source gracefully.
-type HTTPSource struct {
-	name  string
-	tos   string
-	build func(q LegQuery) string
+// HTTPRenderer is the default renderer: a single GET with a realistic UA.
+type HTTPRenderer struct {
 	doer  HTTPDoer
-	limit int // max bytes of body to keep (price pages are large)
+	limit int64
 }
 
-// NewHTTPSource builds a generic source. Pass nil doer for a default client.
-func NewHTTPSource(name, tos string, build func(q LegQuery) string, doer HTTPDoer) *HTTPSource {
+// NewHTTPRenderer builds the HTTP renderer (nil doer -> default client).
+func NewHTTPRenderer(doer HTTPDoer) *HTTPRenderer {
 	if doer == nil {
 		doer = &http.Client{Timeout: 20 * time.Second}
 	}
-	return &HTTPSource{name: name, tos: tos, build: build, doer: doer, limit: 400_000}
+	return &HTTPRenderer{doer: doer, limit: 500_000}
+}
+
+// Render GETs url with browser-like headers.
+func (r *HTTPRenderer) Render(ctx context.Context, url string) (string, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", 0, err
+	}
+	req.Header.Set("User-Agent", realisticUA)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	resp, err := r.doer.Do(req)
+	if err != nil {
+		return "", 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, r.limit))
+	if err != nil {
+		return "", resp.StatusCode, err
+	}
+	return string(body), resp.StatusCode, nil
+}
+
+// PriceSource fetches a public page likely to contain a price for a leg.
+type PriceSource interface {
+	Name() string
+	ToS() string
+	Fetch(ctx context.Context, q LegQuery) (raw string, url string, err error)
+}
+
+// HTTPSource is a configurable source: a URL builder + an HTTP renderer, with an
+// optional headless renderer used when the HTTP body looks empty/JS-only. Anti-
+// bot responses (401/403/429/5xx) are treated as ErrUnavailable so the resolver
+// skips the source gracefully.
+type HTTPSource struct {
+	name     string
+	tos      string
+	build    func(q LegQuery) string
+	http     Renderer
+	headless Renderer // optional; used when HTTP returns an empty/JS-only page
+}
+
+// NewHTTPSource builds a source. Pass nil http renderer for the default; headless
+// may be nil (then no JS fallback).
+func NewHTTPSource(name, tos string, build func(q LegQuery) string, httpR, headless Renderer) *HTTPSource {
+	if httpR == nil {
+		httpR = NewHTTPRenderer(nil)
+	}
+	return &HTTPSource{name: name, tos: tos, build: build, http: httpR, headless: headless}
 }
 
 // Name identifies the source.
@@ -54,33 +97,38 @@ func (s *HTTPSource) Name() string { return s.name }
 // ToS returns the source's terms note.
 func (s *HTTPSource) ToS() string { return s.tos }
 
-// Fetch GETs the built URL with a realistic UA.
+// blocked reports an anti-bot / error status worth skipping (not retry-hammering).
+func blocked(status int) bool {
+	return status == 401 || status == 403 || status == 429 || status >= 500
+}
+
+// looksEmpty is a heuristic for a JS-rendered shell with no useful text.
+func looksEmpty(body string) bool {
+	t := strings.TrimSpace(body)
+	return len(t) < 600 || (!strings.ContainsAny(t, "0123456789") && len(t) < 4000)
+}
+
+// Fetch renders the built URL (HTTP first, headless fallback on empty), skipping
+// gracefully on anti-bot/error.
 func (s *HTTPSource) Fetch(ctx context.Context, q LegQuery) (string, string, error) {
 	u := s.build(q)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return "", u, err
-	}
-	req.Header.Set("User-Agent", realisticUA)
-	req.Header.Set("Accept", "text/html,application/json")
-
-	resp, err := s.doer.Do(req)
+	body, status, err := s.http.Render(ctx, u)
 	if err != nil {
 		return "", u, fmt.Errorf("%w: %v", conn.ErrUnavailable, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-	// Anti-bot / rate-limit / error -> skip this source, do not retry-hammer.
-	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 429 || resp.StatusCode >= 500 {
-		return "", u, fmt.Errorf("%w: status %d (likely blocked)", conn.ErrUnavailable, resp.StatusCode)
+	if blocked(status) {
+		return "", u, fmt.Errorf("%w: status %d (blocked)", conn.ErrUnavailable, status)
 	}
-	if resp.StatusCode != http.StatusOK {
-		return "", u, fmt.Errorf("%w: status %d", conn.ErrUnavailable, resp.StatusCode)
+	// JS-rendered / empty page -> try the headless renderer if present.
+	if s.headless != nil && (status != http.StatusOK || looksEmpty(body)) {
+		if hb, hs, herr := s.headless.Render(ctx, u); herr == nil && !blocked(hs) && !looksEmpty(hb) {
+			return hb, u, nil
+		}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(s.limit)))
-	if err != nil {
-		return "", u, err
+	if status != http.StatusOK {
+		return "", u, fmt.Errorf("%w: status %d", conn.ErrUnavailable, status)
 	}
-	return string(body), u, nil
+	return body, u, nil
 }
 
 var _ PriceSource = (*HTTPSource)(nil)
