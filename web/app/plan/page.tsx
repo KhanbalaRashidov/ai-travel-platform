@@ -102,6 +102,7 @@ export default function PlanPage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [copied, setCopied] = useState(false);
   const [legModes, setLegModes] = useState<Record<string, string>>({});
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
   useEffect(() => {
@@ -252,6 +253,24 @@ export default function PlanPage() {
       children,
       infants,
     };
+  }
+
+  const originThenNames = (ps: Place[]) => [...(origin ? [origin.name] : []), ...ps.map((p) => p.name)];
+
+  // Drag-drop destination reorder: price MY order (no re-sequence). Dropping
+  // destination `from` onto `to` reorders and re-plans that exact order.
+  function reorderDest(from: number, to: number) {
+    if (from === to || from < 0 || to < 0) return;
+    const next = [...places];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPlaces(next);
+    setLegModes({});
+    if (plan) setPending({ ...base(), order: originThenNames(next) });
+  }
+  // "Optimal order": re-sequence via the engine (drop the manual order).
+  function optimalOrder() {
+    setPending({ ...base(), order: undefined });
   }
 
   // Per-leg alternatives selector: override one leg's mode and re-price the same
@@ -479,11 +498,20 @@ export default function PlanPage() {
             <p className="mt-3 text-sm text-muted">{t("plan.pickCities")}</p>
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
-              {places.map((p) => (
+              {places.map((p, i) => (
                 <span
                   key={p.name}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                  draggable
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (dragIdx !== null) reorderDest(dragIdx, i);
+                    setDragIdx(null);
+                  }}
+                  className="inline-flex cursor-grab items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary active:cursor-grabbing"
+                  title={t("plan.dragHint")}
                 >
+                  <span className="text-primary/50">⠿</span>
                   <PinIcon width={13} height={13} />
                   {p.name}
                   <button
@@ -608,6 +636,9 @@ export default function PlanPage() {
             </Card>
 
             <div className="flex flex-wrap justify-end gap-2 print:hidden">
+              <Button variant="ghost" onClick={optimalOrder}>
+                {t("res.optimalOrder")}
+              </Button>
               <Button variant="ghost" onClick={share}>
                 {copied ? t("res.copied") : t("res.share")}
               </Button>
