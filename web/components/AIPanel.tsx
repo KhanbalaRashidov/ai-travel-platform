@@ -182,6 +182,7 @@ export function AIPanel({
           {itin && (
             <RoadmapCards
               roadmap={itin}
+              travelers={brief?.travelers ?? 1}
               labels={{
                 day: (n) => t("res.day", { n }),
                 nights: (n) => t("res.nights", { n }),
@@ -189,6 +190,8 @@ export function AIPanel({
                 free: t("res.free"),
                 approx: t("res.approx"),
                 maps: t("res.maps"),
+                activitiesEst: t("res.activitiesEst"),
+                perPerson: t("res.perPerson"),
               }}
             />
           )}

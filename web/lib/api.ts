@@ -317,6 +317,7 @@ export interface ItineraryBrief {
   legs: { from: string; to: string; mode: string; price: number }[];
   nights: number;
   nights_by_city?: number[];
+  travelers?: number; // party size, for the per-person activities estimate
   currency: string;
   transport_total: number;
   hotels_total: number;

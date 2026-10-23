@@ -11,15 +11,29 @@ function mapsLink(name: string, city: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + city)}`;
 }
 
+// priceNum pulls the first number out of an approximate price string like
+// "~€15", "€12-18" or "15 EUR" (0 when none / free).
+function priceNum(price?: string): number {
+  if (!price) return 0;
+  const m = price.replace(",", ".").match(/\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 // RoadmapCards renders the structured, day-by-day, location-based itinerary:
 // a POI map on top, then one card per day grouped under its city (with the
 // city's summary, best season and nights). No raw markdown — every POI is a row
 // with a real Google Maps link.
 export function RoadmapCards({
   roadmap,
+  travelers = 1,
   labels,
 }: {
   roadmap: Roadmap;
+  travelers?: number;
   labels: {
     day: (n: number) => string;
     nights: (n: number) => string;
@@ -27,9 +41,19 @@ export function RoadmapCards({
     free: string;
     approx: string;
     maps: string;
+    activitiesEst: string;
+    perPerson: string;
   };
 }) {
   const cityInfo = new Map(roadmap.cities.map((c) => [c.city.toLowerCase(), c]));
+
+  // Per-person activities estimate = sum of listed POI prices (approximate).
+  const perPersonActivities = round2(
+    roadmap.days.reduce((s, d) => s + (d.pois ?? []).reduce((a, p) => a + priceNum(p.price), 0), 0)
+  );
+  const groupActivities = round2(perPersonActivities * Math.max(1, travelers));
+  const dayCost = (d: Roadmap["days"][number]) =>
+    round2((d.pois ?? []).reduce((a, p) => a + priceNum(p.price), 0));
 
   // All POIs with coordinates -> map pins (with a real Maps link).
   const points: POIPoint[] = [];
@@ -79,14 +103,21 @@ export function RoadmapCards({
                 className="animate-fade-up rounded-2xl border border-border bg-surface-2/40 p-4"
                 style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
               >
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-fg tabular-nums">
-                    {d.day}
-                  </span>
-                  <span className="text-sm font-semibold">
-                    {labels.day(d.day)} · {d.city}
-                    {d.title ? ` — ${d.title}` : ""}
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-fg tabular-nums">
+                      {d.day}
+                    </span>
+                    <span className="truncate text-sm font-semibold">
+                      {labels.day(d.day)} · {d.city}
+                      {d.title ? ` — ${d.title}` : ""}
+                    </span>
+                  </div>
+                  {dayCost(d) > 0 && (
+                    <span className="shrink-0 rounded-full bg-activities/10 px-2 py-0.5 text-xs font-medium text-activities tabular-nums">
+                      ~€{dayCost(d)}
+                    </span>
+                  )}
                 </div>
 
                 {d.pois && d.pois.length > 0 && (
@@ -130,6 +161,20 @@ export function RoadmapCards({
           );
         })}
       </div>
+
+      {perPersonActivities > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-activities/30 bg-activities/5 px-4 py-3 text-sm">
+          <span className="font-medium text-activities">{labels.activitiesEst}</span>
+          <span className="tabular-nums">
+            <span className="font-semibold">~€{groupActivities}</span>
+            {travelers > 1 && (
+              <span className="ml-2 text-muted">
+                (~€{perPersonActivities} / {labels.perPerson})
+              </span>
+            )}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

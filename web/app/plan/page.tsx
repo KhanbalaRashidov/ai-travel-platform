@@ -424,6 +424,7 @@ export default function PlanPage() {
         legs: (plan.legs ?? []).map((l) => ({ from: l.from, to: l.to, mode: l.mode, price: l.price })),
         nights: plan.nights,
         nights_by_city: plan.nights_by_city,
+        travelers: plan.travelers,
         currency: plan.currency,
         transport_total: plan.transport,
         hotels_total: plan.hotels,
