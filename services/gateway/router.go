@@ -44,11 +44,16 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 
 	kv := cache.NewRedisKV(rdb)
 	geo := knowledge.SeedGeocoder()
-	routeFW := dataflow.NewRouteFlywheel(kv, kbStore, estimate.New(geo, 0), 0)
+	estimator := estimate.New(geo, 0)
+	routeFW := dataflow.NewRouteFlywheel(kv, kbStore, estimator, 0)
 	poiSrc := poi.New(geo, nil, 0)
 	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore)
 
-	aiH := handler.NewAIHandler(aiPrimary, aiBulk)
+	// Attach the planner + flywheel as LLM tools to the chat orchestrator.
+	aiH := handler.NewAIHandler(aiPrimary, aiBulk,
+		NewSequenceTool(estimator),
+		NewQuoteTool(routeFW, defaultTenantID),
+	)
 
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
@@ -70,9 +75,11 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Get("/data/destinations", dataH.Destinations)
 	v1.Get("/data/poi", dataH.POIs)
 
-	// AI (Claude): itinerary writer + chat. 503 when the key is not configured.
+	// AI (Claude): itinerary writer + chat + conversational refine loop.
+	// 503 when the key is not configured.
 	v1.Post("/ai/itinerary", aiH.Itinerary)
 	v1.Post("/ai/chat", aiH.Chat)
+	v1.Post("/ai/refine", aiH.Refine)
 
 	return app
 }

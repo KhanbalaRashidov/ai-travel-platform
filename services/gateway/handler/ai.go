@@ -1,24 +1,30 @@
 package handler
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/httpx"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 )
 
-// AIHandler serves the LLM features: the itinerary writer (bulk model) and chat
-// (reasoning model + guardrail). When the Anthropic key is unset both LLMs are
-// nil and the endpoints report 503 "AI not configured" — the rest of the
-// platform is unaffected.
+// AIHandler serves the LLM features: the itinerary writer (bulk model), chat
+// (reasoning model + guardrail, with planner/flywheel tools), and the
+// conversational refine loop. When the Anthropic key is unset both LLMs are nil
+// and the endpoints report 503 "AI not configured" — the rest of the platform
+// is unaffected.
 type AIHandler struct {
-	primary ai.LLM // reasoning (chat)
+	primary ai.LLM // reasoning (chat + edit parsing)
 	bulk    ai.LLM // cheap formatting (itinerary)
+	tools   []ai.Tool
 }
 
-// NewAIHandler wires the handler. Pass nil LLMs when the key is not configured.
-func NewAIHandler(primary, bulk ai.LLM) *AIHandler {
-	return &AIHandler{primary: primary, bulk: bulk}
+// NewAIHandler wires the handler. Pass nil LLMs when the key is not configured;
+// tools (planner/flywheel) are attached to the chat orchestrator.
+func NewAIHandler(primary, bulk ai.LLM, tools ...ai.Tool) *AIHandler {
+	return &AIHandler{primary: primary, bulk: bulk, tools: tools}
 }
 
 // Enabled reports whether the AI features are configured.
@@ -86,10 +92,53 @@ func (h *AIHandler) Chat(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil || req.Message == "" {
 		return httpx.Err(c, fiber.StatusBadRequest, "message is required")
 	}
-	orch := ai.NewOrchestrator(h.primary, 4, 1)
+	orch := ai.NewOrchestrator(h.primary, 4, 1, h.tools...)
 	res, err := orch.Run(c.Context(), chatSystem, req.Message)
 	if err != nil {
 		return httpx.Err(c, fiber.StatusBadGateway, "chat failed")
 	}
 	return httpx.OK(c, res)
+}
+
+type refineReq struct {
+	Message string       `json:"message"`
+	State   ai.EditState `json:"state"`
+}
+
+type refineResp struct {
+	State   ai.EditState `json:"state"`
+	Changed []string     `json:"changed"`
+}
+
+// Refine handles POST /ai/refine — the conversational edit loop. The LLM turns a
+// request like "make it cheaper" / "drop Istanbul" / "add a day" into a
+// structured TripEdit, which is applied deterministically. The client then
+// re-runs the TSP + re-pricing engine with the returned state, so the itinerary
+// and cost panel update live. The LLM never computes routes or prices.
+func (h *AIHandler) Refine(c *fiber.Ctx) error {
+	if h.primary == nil {
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured (set ANTHROPIC_API_KEY)")
+	}
+	var req refineReq
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Message) == "" {
+		return httpx.Err(c, fiber.StatusBadRequest, "message is required")
+	}
+	edit, err := ai.ExtractEdit(c.Context(), h.primary, req.Message, summarizeState(req.State))
+	if err != nil {
+		return httpx.Err(c, fiber.StatusBadGateway, "could not understand the edit")
+	}
+	newState, changed := ai.ApplyEdit(req.State, edit)
+	return httpx.OK(c, refineResp{State: newState, Changed: changed})
+}
+
+// summarizeState renders the current wizard state for the edit-parsing prompt.
+func summarizeState(s ai.EditState) string {
+	var b strings.Builder
+	b.WriteString("cities: " + strings.Join(s.Cities, ", "))
+	b.WriteString("; start: " + s.Start)
+	b.WriteString("; tier: " + s.Tier)
+	b.WriteString("; mode: " + s.Mode)
+	b.WriteString("; nights: ")
+	b.WriteString(strconv.Itoa(s.Nights))
+	return b.String()
 }

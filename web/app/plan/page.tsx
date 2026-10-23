@@ -18,6 +18,7 @@ import {
 import {
   Breakdown,
   destinations,
+  EditState,
   ItineraryBrief,
   PricedHotel,
   PricedLeg,
@@ -156,6 +157,35 @@ export default function PlanPage() {
     [tier, pref, nights, currency, t]
   );
 
+  // runPlan takes explicit params so it can be driven both by the wizard and by
+  // the AI refine loop (which has just set new state).
+  const runPlan = useCallback(
+    async (sel: string[], startCode: string, modePref: ModePref) => {
+      if (sel.length < 2) {
+        setError(t("err.minCities"));
+        return;
+      }
+      const startSel = sel.includes(startCode) ? startCode : sel[0];
+      const cities = cityList.filter((c) => sel.includes(c.code));
+      const startIdx = cities.findIndex((c) => c.code === startSel);
+      const matrix = buildMatrix(cities, modePref);
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await sequence(matrix, startIdx, -1);
+        const p: Planned = { cities, route: res.best, alt: res.alt };
+        setPlanned(p);
+        await reprice(p);
+      } catch {
+        setError(t("err.sequence"));
+        setPlanned(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cityList, reprice, t]
+  );
+
   async function onPlan() {
     if (selected.length < 2) {
       setError(t("err.minCities"));
@@ -165,22 +195,7 @@ export default function PlanPage() {
       setError(t("err.startInvalid"));
       return;
     }
-    const cities = cityList.filter((c) => selected.includes(c.code));
-    const startIdx = cities.findIndex((c) => c.code === start);
-    const matrix = buildMatrix(cities, pref);
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await sequence(matrix, startIdx, -1);
-      const p: Planned = { cities, route: res.best, alt: res.alt };
-      setPlanned(p);
-      await reprice(p);
-    } catch {
-      setError(t("err.sequence"));
-      setPlanned(null);
-    } finally {
-      setLoading(false);
-    }
+    await runPlan(selected, start, pref);
   }
 
   // Live re-price when tier/mode/nights/currency change (order untouched).
@@ -188,6 +203,48 @@ export default function PlanPage() {
     if (planned) void reprice(planned);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, pref, nights, currency]);
+
+  // After an AI refine sets new wizard state, re-run the engine with it so the
+  // route + cost panel update live. Runs once per refine (flag cleared).
+  const [pendingReplan, setPendingReplan] = useState<{
+    sel: string[];
+    start: string;
+    pref: ModePref;
+  } | null>(null);
+  useEffect(() => {
+    if (!pendingReplan) return;
+    const p = pendingReplan;
+    setPendingReplan(null);
+    void runPlan(p.sel, p.start, p.pref);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReplan]);
+
+  // Apply an AI-parsed edit: map city names back to codes, update the wizard
+  // state, and queue a re-plan.
+  function applyRefine(s: EditState) {
+    const byName = (n: string) =>
+      cityList.find((c) => c.name.toLowerCase() === n.toLowerCase());
+    const newSelected = s.cities
+      .map(byName)
+      .filter((c): c is City => !!c)
+      .map((c) => c.code);
+    const newTier = (["budget", "standard", "vip"].includes(s.tier) ? s.tier : tier) as Tier;
+    const newPref = (["cheapest", "flight", "train", "bus"].includes(s.mode)
+      ? s.mode
+      : pref) as ModePref;
+    const newNights = s.nights > 0 ? s.nights : nights;
+    const startCity = byName(s.start);
+    const newStart = startCity ? startCity.code : newSelected[0] ?? start;
+
+    setSelected(newSelected);
+    setStart(newStart);
+    setTier(newTier);
+    setPref(newPref);
+    setNights(newNights);
+    if (newSelected.length >= 2) {
+      setPendingReplan({ sel: newSelected, start: newStart, pref: newPref });
+    }
+  }
 
   const fmt = (n: number) =>
     n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -228,6 +285,15 @@ export default function PlanPage() {
           total: breakdown.total,
         }
       : null;
+
+  // Current wizard state the AI refine loop edits (cities by name).
+  const refineState: EditState = {
+    cities: cityList.filter((c) => selected.includes(c.code)).map((c) => c.name),
+    start: cityList.find((c) => c.code === start)?.name ?? "",
+    tier,
+    mode: pref,
+    nights,
+  };
 
   const segments: CostSegment[] = breakdown
     ? [
@@ -393,8 +459,12 @@ export default function PlanPage() {
               <RouteMap points={mapPoints} closed={planned.route.variant === "round_trip"} />
             </Card>
 
-            {/* AI: itinerary writer + chat */}
-            <AIPanel brief={aiBrief} />
+            {/* AI: itinerary writer + conversational refine */}
+            <AIPanel
+              brief={aiBrief}
+              refineState={planned ? refineState : null}
+              onRefine={(s) => applyRefine(s)}
+            />
           </section>
         )}
       </main>

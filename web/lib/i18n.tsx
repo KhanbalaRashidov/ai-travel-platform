@@ -86,6 +86,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "ai.off.desc": "Server AI açarı olmadan işləyir. Açar əlavə ediləndə bu bölmə aktivləşəcək.",
     "ai.error": "AI cavabı alınmadı. Yenidən cəhd et.",
     "ai.retry": "Yenidən cəhd et",
+    "ai.ch.applied": "Tətbiq olundu:",
+    "ai.ch.none": "Dəyişiklik tapmadım — başqa cür ifadə et.",
     "err.minCities": "Ən azı 2 şəhər seçin.",
     "err.startInvalid": "Başlanğıc şəhər seçilmiş şəhərlər arasında olmalıdır.",
     "err.modeImpossible":
@@ -155,6 +157,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "ai.off.desc": "The server runs without an AI key. This section activates once a key is added.",
     "ai.error": "AI request failed. Please try again.",
     "ai.retry": "Try again",
+    "ai.ch.applied": "Applied:",
+    "ai.ch.none": "I couldn't find a change — try rephrasing.",
     "err.minCities": "Select at least 2 cities.",
     "err.startInvalid": "Start city must be among the selected cities.",
     "err.modeImpossible":
@@ -224,6 +228,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "ai.off.desc": "Сервер работает без AI-ключа. Раздел активируется после добавления ключа.",
     "ai.error": "Не удалось получить ответ AI. Попробуйте снова.",
     "ai.retry": "Повторить",
+    "ai.ch.applied": "Применено:",
+    "ai.ch.none": "Не нашёл изменения — переформулируйте.",
     "err.minCities": "Выберите минимум 2 города.",
     "err.startInvalid": "Город старта должен быть среди выбранных.",
     "err.modeImpossible":
@@ -293,6 +299,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "ai.off.desc": "Sunucu AI anahtarı olmadan çalışıyor. Anahtar eklenince bu bölüm etkinleşir.",
     "ai.error": "AI yanıtı alınamadı. Lütfen tekrar dene.",
     "ai.retry": "Tekrar dene",
+    "ai.ch.applied": "Uygulandı:",
+    "ai.ch.none": "Bir değişiklik bulamadım — farklı ifade et.",
     "err.minCities": "En az 2 şehir seçin.",
     "err.startInvalid": "Başlangıç şehri seçilenler arasında olmalı.",
     "err.modeImpossible":

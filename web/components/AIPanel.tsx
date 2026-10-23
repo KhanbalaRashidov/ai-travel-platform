@@ -4,9 +4,10 @@ import { useState } from "react";
 import {
   AIResult,
   ApiError,
-  chat as chatApi,
+  EditState,
   itinerary as itineraryApi,
   ItineraryBrief,
+  refine as refineApi,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { Button, Card } from "./ui";
@@ -17,10 +18,20 @@ interface ChatTurn {
   text: string;
 }
 
-// AIPanel wires the itinerary writer and chat to the backend. It handles a 503
-// (AI not configured) by switching the whole panel to a friendly "AI is off"
-// state, and keeps per-feature loading/error/empty states.
-export function AIPanel({ brief }: { brief: ItineraryBrief | null }) {
+// AIPanel wires the itinerary writer and the conversational refine loop to the
+// backend. Chat edits ("make it cheaper", "drop Istanbul", "add a day") are
+// parsed by the LLM, applied deterministically, and handed back via onRefine so
+// the plan page re-runs the engine and the panel updates live. A 503 switches
+// the whole panel to a friendly "AI is off" state.
+export function AIPanel({
+  brief,
+  refineState,
+  onRefine,
+}: {
+  brief: ItineraryBrief | null;
+  refineState: EditState | null;
+  onRefine: (state: EditState, changed: string[]) => void;
+}) {
   const { t } = useI18n();
   const [aiOff, setAiOff] = useState(false);
 
@@ -55,16 +66,35 @@ export function AIPanel({ brief }: { brief: ItineraryBrief | null }) {
     }
   }
 
+  // Render change codes ("mode:cheapest", "removed:Istanbul", "nights:3") as a
+  // localized, human-readable confirmation.
+  function describeChanges(changed: string[]): string {
+    if (changed.length === 0) return t("ai.ch.none");
+    const parts = changed.map((code) => {
+      const idx = code.indexOf(":");
+      const k = idx >= 0 ? code.slice(0, idx) : code;
+      const v = idx >= 0 ? code.slice(idx + 1) : "";
+      if (k === "mode") return `${t("plan.transport")}: ${t("mode." + v)}`;
+      if (k === "tier") return `${t("plan.comfort")}: ${t("tier." + v)}`;
+      if (k === "nights") return `${t("plan.nights")}: ${v}`;
+      if (k === "removed") return `− ${v}`;
+      if (k === "added") return `+ ${v}`;
+      return code;
+    });
+    return `${t("ai.ch.applied")} ${parts.join(", ")}`;
+  }
+
   async function send() {
     const msg = input.trim();
-    if (!msg || chatLoading) return;
+    if (!msg || chatLoading || !refineState) return;
     setMessages((m) => [...m, { role: "user", text: msg }]);
     setInput("");
     setChatLoading(true);
     setChatErr(null);
     try {
-      const r = await chatApi(msg);
-      setMessages((m) => [...m, { role: "assistant", text: r.text }]);
+      const r = await refineApi(msg, refineState);
+      setMessages((m) => [...m, { role: "assistant", text: describeChanges(r.changed) }]);
+      onRefine(r.state, r.changed);
     } catch (e) {
       if (!handledAsOff(e)) setChatErr(t("ai.error"));
     } finally {
@@ -195,9 +225,10 @@ export function AIPanel({ brief }: { brief: ItineraryBrief | null }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t("ai.chat.placeholder")}
-            className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface"
+            disabled={!refineState}
+            className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface disabled:opacity-50"
           />
-          <Button type="submit" disabled={chatLoading || input.trim() === ""}>
+          <Button type="submit" disabled={chatLoading || input.trim() === "" || !refineState}>
             {t("ai.chat.send")}
           </Button>
         </form>

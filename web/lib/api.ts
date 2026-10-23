@@ -136,6 +136,26 @@ export function chat(message: string): Promise<AIResult> {
   return postJSON("/ai/chat", { message });
 }
 
+// Conversational refine: the backend LLM parses the edit, applies it
+// deterministically, and returns the new wizard state + machine-readable change
+// codes. The client re-runs the engine with the returned state.
+export interface EditState {
+  cities: string[];
+  start: string;
+  tier: string;
+  mode: string;
+  nights: number;
+}
+
+export interface RefineResult {
+  state: EditState;
+  changed: string[];
+}
+
+export function refine(message: string, state: EditState): Promise<RefineResult> {
+  return postJSON("/ai/refine", { message, state });
+}
+
 export function sequence(
   matrix: number[][],
   start: number,
