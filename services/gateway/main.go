@@ -14,6 +14,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/config"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/db"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 )
 
@@ -44,12 +45,33 @@ func main() {
 		}
 	}
 
-	app := buildApp(pool, rdb, jwtMgr, defaultTenantID)
+	aiPrimary, aiBulk := buildLLMs(cfg)
+
+	app := buildApp(pool, rdb, jwtMgr, defaultTenantID, aiPrimary, aiBulk)
 
 	log.Printf("gateway listening on :%s (env=%s)", cfg.Port, cfg.AppEnv)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("listen: %v", err)
 	}
+}
+
+// buildLLMs constructs the Claude adapters when the Anthropic key is set. Both
+// share one budget (fail-closed at the cap) and a meter that logs token/cost per
+// call. When the key is empty it returns nil,nil and the AI endpoints report 503.
+func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
+	if cfg.AnthropicAPIKey == "" {
+		log.Printf("AI disabled: ANTHROPIC_API_KEY not set (AI endpoints will return 503)")
+		return nil, nil
+	}
+	budget := ai.NewBudget(cfg.AIBudgetUSD)
+	meter := func(model string, u ai.Usage) {
+		log.Printf("ai: model=%s in=%d out=%d cost=$%.4f spent=$%.4f/$%.2f",
+			model, u.InputTokens, u.OutputTokens, u.CostUSD, budget.SpentUSD, budget.LimitUSD)
+	}
+	primary := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelPrimary, nil).WithBudget(budget).WithMeter(meter)
+	bulk := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelBulk, nil).WithBudget(budget).WithMeter(meter)
+	log.Printf("AI enabled: primary=%s bulk=%s budget=$%.2f", ai.ModelPrimary.Name, ai.ModelBulk.Name, cfg.AIBudgetUSD)
+	return primary, bulk
 }
 
 // loadDefaultTenantID looks up the single default tenant used in the current

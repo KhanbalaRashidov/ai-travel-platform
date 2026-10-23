@@ -18,6 +18,12 @@ type Config struct {
 	RedisURL    string
 	JWTSecret   string
 	JWTTTL      time.Duration
+
+	// AI (Anthropic). The key is read from the environment only — never hardcoded
+	// or committed. When empty, the AI endpoints report "not configured" and the
+	// rest of the platform runs normally.
+	AnthropicAPIKey string
+	AIBudgetUSD     float64
 }
 
 // Load reads configuration from the environment, applying sensible dev defaults.
@@ -32,7 +38,19 @@ func Load() Config {
 		RedisURL:    getenv("REDIS_URL", "redis://localhost:6379/0"),
 		JWTSecret:   getenv("JWT_SECRET", "dev-insecure-change-me"),
 		JWTTTL:      time.Duration(getenvInt("JWT_TTL_HOURS", 72)) * time.Hour,
+
+		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
+		AIBudgetUSD:     getenvFloat("AI_BUDGET_USD", 100),
 	}
+}
+
+func getenvFloat(key string, fallback float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return fallback
 }
 
 func getenv(key, fallback string) string {

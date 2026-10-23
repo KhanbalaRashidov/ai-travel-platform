@@ -11,6 +11,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/auth"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/cache"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/poi"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
@@ -21,7 +22,8 @@ import (
 )
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
-func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string) *fiber.App {
+// aiPrimary/aiBulk are nil when the Anthropic key is not configured.
+func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "ai-travel-gateway"})
 	app.Use(recover.New(), logger.New(), cors.New())
 	app.Use(tenant.Middleware(defaultTenantID))
@@ -46,6 +48,8 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	poiSrc := poi.New(geo, nil, 0)
 	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore)
 
+	aiH := handler.NewAIHandler(aiPrimary, aiBulk)
+
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
 	v1.Post("/auth/login", authH.Login)
@@ -65,6 +69,10 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Get("/data/transport", dataH.Transport)
 	v1.Get("/data/destinations", dataH.Destinations)
 	v1.Get("/data/poi", dataH.POIs)
+
+	// AI (Claude): itinerary writer + chat. 503 when the key is not configured.
+	v1.Post("/ai/itinerary", aiH.Itinerary)
+	v1.Post("/ai/chat", aiH.Chat)
 
 	return app
 }
