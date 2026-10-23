@@ -237,7 +237,7 @@ func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSp
 	if g.budget != nil && g.budget.Remaining() <= 0 {
 		return Completion{}, fmt.Errorf("ai budget exhausted (spent $%.4f of $%.2f)", g.budget.SpentUSD, g.budget.LimitUSD)
 	}
-	payload, err := json.Marshal(buildGeminiRequest(g.maxTokens, msgs, tools, jsonMode))
+	payload, err := json.Marshal(buildGeminiRequest(MaxTokensFrom(ctx, g.maxTokens), msgs, tools, jsonMode))
 	if err != nil {
 		return Completion{}, err
 	}

@@ -5,6 +5,28 @@ import (
 	"errors"
 )
 
+// maxTokensCtxKey carries a per-call max-output-tokens override, so a caller
+// that needs a large structured reply (e.g. a day-by-day roadmap) can raise the
+// provider's default without changing it globally.
+type maxTokensCtxKey struct{}
+
+// WithMaxTokens returns a context that overrides the output-token cap for the
+// next LLM call. n<=0 is ignored.
+func WithMaxTokens(ctx context.Context, n int) context.Context {
+	if n <= 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, maxTokensCtxKey{}, n)
+}
+
+// MaxTokensFrom returns the per-call override from ctx, or def when unset.
+func MaxTokensFrom(ctx context.Context, def int) int {
+	if v, ok := ctx.Value(maxTokensCtxKey{}).(int); ok && v > 0 {
+		return v
+	}
+	return def
+}
+
 // Role is a chat message role.
 type Role string
 

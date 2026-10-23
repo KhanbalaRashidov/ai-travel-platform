@@ -132,12 +132,11 @@ func (h *AIHandler) Roadmap(c *fiber.Ctx) error {
 			coords[strings.ToLower(strings.TrimSpace(p.Name))] = ai.LatLng{Lat: p.Lat, Lng: p.Lng}
 		}
 	}
+	// Never 502 the roadmap: on any LLM timeout/error/parse failure, serve the
+	// deterministic skeleton (days + cities + nights) and let POIs fill lazily.
 	res, err := ai.StructuredRoadmap(c.Context(), h.bulk, req.Cities, req.NightsByCity, coords, langName(req.Locale))
 	if err != nil {
-		if ai.IsTransient(err) {
-			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
-		}
-		return httpx.Err(c, fiber.StatusBadGateway, "roadmap generation failed")
+		log.Printf("ai roadmap: degraded to skeleton: %v", err)
 	}
 	return httpx.OK(c, res)
 }

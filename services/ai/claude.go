@@ -195,7 +195,7 @@ func (c *ClaudeLLM) Complete(ctx context.Context, msgs []Message, tools []ToolSp
 		return Completion{}, fmt.Errorf("ai budget exhausted (spent $%.4f of $%.2f)", c.budget.SpentUSD, c.budget.LimitUSD)
 	}
 
-	payload, err := json.Marshal(buildRequest(c.route.Name, c.maxTokens, msgs, tools))
+	payload, err := json.Marshal(buildRequest(c.route.Name, MaxTokensFrom(ctx, c.maxTokens), msgs, tools))
 	if err != nil {
 		return Completion{}, err
 	}
