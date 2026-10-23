@@ -18,6 +18,7 @@ func planApp() *fiber.App {
 	h := NewPlanHandler(service.NewPlanService())
 	app.Post("/plan/sequence", h.Sequence)
 	app.Post("/plan/price", h.Price)
+	app.Post("/plan/legs", h.Legs)
 	return app
 }
 
@@ -72,5 +73,28 @@ func TestPriceEndpoint(t *testing.T) {
 	data, _ := out["data"].(map[string]any)
 	if data["transport"].(float64) != 100 || data["hotels"].(float64) != 80 || data["total"].(float64) != 180 {
 		t.Fatalf("unexpected breakdown: %v", data)
+	}
+}
+
+func TestLegsEndpoint(t *testing.T) {
+	app := planApp()
+	body := `{"legs":[{"from":"BAK","to":"TBS","options":[
+		{"mode":"flight","price":{"amount":120,"currency":"EUR"},"duration_minutes":90},
+		{"mode":"bus","price":{"amount":25,"currency":"EUR"},"duration_minutes":720}
+	]}]}`
+	out := doJSON(t, app, "/plan/legs", body)
+
+	data, _ := out["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("expected 1 leg, got %v", data)
+	}
+	leg, _ := data[0].(map[string]any)
+	cheapest, _ := leg["cheapest"].(map[string]any)
+	fastest, _ := leg["fastest"].(map[string]any)
+	if cheapest["mode"] != "bus" {
+		t.Fatalf("expected cheapest bus, got %v", cheapest["mode"])
+	}
+	if fastest["mode"] != "flight" {
+		t.Fatalf("expected fastest flight, got %v", fastest["mode"])
 	}
 }

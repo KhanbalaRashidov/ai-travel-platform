@@ -75,3 +75,23 @@ func (h *PlanHandler) Price(c *fiber.Ctx) error {
 	}
 	return httpx.OK(c, b)
 }
+
+type legsReq struct {
+	Legs []planner.LegInput `json:"legs"`
+}
+
+// Legs handles POST /plan/legs: per-leg transport mode comparison.
+func (h *PlanHandler) Legs(c *fiber.Ctx) error {
+	var req legsReq
+	if err := c.BodyParser(&req); err != nil {
+		return httpx.Err(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	if len(req.Legs) == 0 {
+		return httpx.Err(c, fiber.StatusBadRequest, "legs are required")
+	}
+	res, err := h.svc.CompareLegs(req.Legs)
+	if err != nil {
+		return httpx.Err(c, fiber.StatusUnprocessableEntity, err.Error())
+	}
+	return httpx.OK(c, res)
+}

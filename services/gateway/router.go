@@ -41,6 +41,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// Cost-optimization engine (pure/stateless, public — advisory product).
 	v1.Post("/plan/sequence", planH.Sequence)
 	v1.Post("/plan/price", planH.Price)
+	v1.Post("/plan/legs", planH.Legs)
 
 	// Knowledge base: popularity-driven recommendations (data flywheel).
 	v1.Get("/recommendations", recH.List)

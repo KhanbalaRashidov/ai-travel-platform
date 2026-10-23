@@ -18,3 +18,8 @@ func (s *PlanService) Sequence(m planner.Matrix, start, end int) (best, alt plan
 func (s *PlanService) Price(in planner.PlanInput, rates map[string]float64) (planner.Breakdown, error) {
 	return planner.Price(in, planner.StaticConverter{Rates: rates})
 }
+
+// CompareLegs returns the cheapest/fastest option + sorted alternatives per leg.
+func (s *PlanService) CompareLegs(legs []planner.LegInput) ([]planner.LegComparison, error) {
+	return planner.CompareLegs(legs)
+}
