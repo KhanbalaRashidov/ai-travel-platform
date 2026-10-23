@@ -27,7 +27,8 @@ type Message struct {
 	Role       Role       `json:"role"`
 	Content    string     `json:"content,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"` // for RoleTool results
+	ToolCallID string     `json:"tool_call_id,omitempty"` // for RoleTool results (Claude)
+	ToolName   string     `json:"tool_name,omitempty"`    // for RoleTool results (Gemini functionResponse)
 }
 
 // ToolSpec describes a tool to the model.

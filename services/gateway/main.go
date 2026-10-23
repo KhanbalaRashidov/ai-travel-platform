@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -55,23 +56,36 @@ func main() {
 	}
 }
 
-// buildLLMs constructs the Claude adapters when the Anthropic key is set. Both
-// share one budget (fail-closed at the cap) and a meter that logs token/cost per
-// call. When the key is empty it returns nil,nil and the AI endpoints report 503.
+// buildLLMs constructs the LLM adapters for the selected provider. Both share
+// one budget (fail-closed at the cap) and a meter that logs token/cost per call.
+// When the selected provider's key is empty it returns nil,nil and the AI
+// endpoints report 503. Default provider is Gemini (free).
 func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
-	if cfg.AnthropicAPIKey == "" {
-		log.Printf("AI disabled: ANTHROPIC_API_KEY not set (AI endpoints will return 503)")
-		return nil, nil
-	}
 	budget := ai.NewBudget(cfg.AIBudgetUSD)
 	meter := func(model string, u ai.Usage) {
 		log.Printf("ai: model=%s in=%d out=%d cost=$%.4f spent=$%.4f/$%.2f",
 			model, u.InputTokens, u.OutputTokens, u.CostUSD, budget.SpentUSD, budget.LimitUSD)
 	}
-	primary := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelPrimary, nil).WithBudget(budget).WithMeter(meter)
-	bulk := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelBulk, nil).WithBudget(budget).WithMeter(meter)
-	log.Printf("AI enabled: primary=%s bulk=%s budget=$%.2f", ai.ModelPrimary.Name, ai.ModelBulk.Name, cfg.AIBudgetUSD)
-	return primary, bulk
+
+	switch strings.ToLower(cfg.LLMProvider) {
+	case "claude":
+		if cfg.AnthropicAPIKey == "" {
+			log.Printf("AI disabled: provider=claude but ANTHROPIC_API_KEY not set (AI endpoints will return 503)")
+			return nil, nil
+		}
+		primary := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelPrimary, nil).WithBudget(budget).WithMeter(meter)
+		bulk := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelBulk, nil).WithBudget(budget).WithMeter(meter)
+		log.Printf("AI enabled: provider=claude primary=%s bulk=%s budget=$%.2f", ai.ModelPrimary.Name, ai.ModelBulk.Name, cfg.AIBudgetUSD)
+		return primary, bulk
+	default: // gemini (free)
+		if cfg.GeminiAPIKey == "" {
+			log.Printf("AI disabled: provider=gemini but GEMINI_API_KEY not set (AI endpoints will return 503)")
+			return nil, nil
+		}
+		llm := ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiModel, nil).WithBudget(budget).WithMeter(meter)
+		log.Printf("AI enabled: provider=gemini model=%s (free)", llm.Model())
+		return llm, llm // one free model serves both reasoning and bulk
+	}
 }
 
 // loadDefaultTenantID looks up the single default tenant used in the current

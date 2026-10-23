@@ -19,9 +19,13 @@ type Config struct {
 	JWTSecret   string
 	JWTTTL      time.Duration
 
-	// AI (Anthropic). The key is read from the environment only — never hardcoded
-	// or committed. When empty, the AI endpoints report "not configured" and the
-	// rest of the platform runs normally.
+	// AI. Keys are read from the environment only — never hardcoded or committed.
+	// LLMProvider selects the backend ("gemini" default, free; or "claude").
+	// When the selected provider's key is empty, the AI endpoints report "not
+	// configured" and the rest of the platform runs normally.
+	LLMProvider     string
+	GeminiAPIKey    string
+	GeminiModel     string
 	AnthropicAPIKey string
 	AIBudgetUSD     float64
 }
@@ -39,6 +43,9 @@ func Load() Config {
 		JWTSecret:   getenv("JWT_SECRET", "dev-insecure-change-me"),
 		JWTTTL:      time.Duration(getenvInt("JWT_TTL_HOURS", 72)) * time.Hour,
 
+		LLMProvider:     getenv("LLM_PROVIDER", "gemini"),
+		GeminiAPIKey:    os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:     getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
 		AIBudgetUSD:     getenvFloat("AI_BUDGET_USD", 100),
 	}

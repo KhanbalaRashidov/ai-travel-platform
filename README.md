@@ -28,18 +28,18 @@ cd web && npm install && npm run dev
 
 Health: `GET http://localhost:8080/health` · Readiness (db+redis): `GET /ready`
 
-### AI (Claude)
-Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else:
+### AI (Gemini by default, free — or Claude)
+Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else. Default provider is **Gemini** (free):
 ```bash
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env     # optional: AI_BUDGET_USD=100
+echo 'GEMINI_API_KEY=...' >> .env                # LLM_PROVIDER=gemini is the default
 docker compose -f deploy/docker-compose.yml up -d
 ```
-The api service loads the repo-root `.env` via `env_file` (no `--env-file`, no `${...}` interpolation warnings). Verify:
+To use Claude instead, set `LLM_PROVIDER=claude` and `ANTHROPIC_API_KEY=...` in `.env`. The api service loads the repo-root `.env` via `env_file` (no `--env-file`, no `${...}` interpolation warnings). Verify:
 ```bash
-docker compose -f deploy/docker-compose.yml logs api | grep -i AI            # -> "AI enabled: ..."
-docker compose -f deploy/docker-compose.yml exec api printenv | grep ANTHROPIC  # -> key present
+docker compose -f deploy/docker-compose.yml logs api | grep -i AI             # -> "AI enabled: provider=gemini model=..."
+docker compose -f deploy/docker-compose.yml exec api printenv | grep -E 'GEMINI|LLM_PROVIDER'
 ```
-Without the key the stack still runs; the AI endpoints return 503 ("AI not configured"). Explicit `environment:` values (DATABASE_URL/REDIS_URL/JWT_*) override anything in `.env`, so the container keeps its service-DNS URLs.
+Without the selected provider's key the stack still runs; the AI endpoints return 503 ("AI not configured"). Explicit `environment:` values (DATABASE_URL/REDIS_URL/JWT_*) override anything in `.env`, so the container keeps its service-DNS URLs.
 
 ## Monorepo layout
 ```

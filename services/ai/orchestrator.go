@@ -70,7 +70,7 @@ func (o *Orchestrator) Run(ctx context.Context, systemPrompt, userPrompt string)
 			for _, tc := range comp.ToolCalls {
 				res := o.callTool(ctx, tc)
 				grounding = append(grounding, ExtractMoneyValues(res)...)
-				msgs = append(msgs, Message{Role: RoleTool, ToolCallID: tc.ID, Content: res})
+				msgs = append(msgs, Message{Role: RoleTool, ToolCallID: tc.ID, ToolName: tc.Name, Content: res})
 			}
 			continue
 		}
