@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -123,10 +125,15 @@ func (h *AIHandler) Refine(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Message) == "" {
 		return httpx.Err(c, fiber.StatusBadRequest, "message is required")
 	}
+	started := time.Now()
 	edit, err := ai.ExtractEdit(c.Context(), h.primary, req.Message, summarizeState(req.State))
+	elapsed := time.Since(started)
 	if err != nil {
+		// The error carries a masked/raw snippet of the model reply for diagnosis.
+		log.Printf("ai refine: failed in %s: %v", elapsed.Round(time.Millisecond), err)
 		return httpx.Err(c, fiber.StatusBadGateway, "could not understand the edit")
 	}
+	log.Printf("ai refine: ok in %s", elapsed.Round(time.Millisecond))
 	newState, changed := ai.ApplyEdit(req.State, edit)
 	return httpx.OK(c, refineResp{State: newState, Changed: changed})
 }

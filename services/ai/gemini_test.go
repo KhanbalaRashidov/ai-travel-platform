@@ -9,7 +9,7 @@ func TestBuildGeminiRequest_SystemRolesAndTools(t *testing.T) {
 		{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "t1", Name: "quote", Args: map[string]any{"from": "Baku"}}}},
 		{Role: RoleTool, ToolCallID: "t1", ToolName: "quote", Content: "120 EUR"},
 	}
-	req := buildGeminiRequest(256, msgs, []ToolSpec{{Name: "quote", Description: "d"}})
+	req := buildGeminiRequest(256, msgs, []ToolSpec{{Name: "quote", Description: "d"}}, false)
 
 	if req.SystemInstruction == nil || req.SystemInstruction.Parts[0].Text != "sys A" {
 		t.Fatalf("system not mapped to systemInstruction: %+v", req.SystemInstruction)
@@ -75,6 +75,31 @@ func TestParseGeminiResponse_APIError(t *testing.T) {
 	body := `{"error":{"code":400,"message":"bad key","status":"INVALID_ARGUMENT"}}`
 	if _, _, err := parseGeminiResponse([]byte(body)); err == nil {
 		t.Fatal("expected an error for an API error payload")
+	}
+}
+
+func TestBuildGeminiRequest_JSONMode(t *testing.T) {
+	plain := buildGeminiRequest(100, []Message{{Role: RoleUser, Content: "hi"}}, nil, false)
+	if plain.GenerationConfig.ResponseMIMEType != "" {
+		t.Fatalf("plain mode should not set responseMimeType, got %q", plain.GenerationConfig.ResponseMIMEType)
+	}
+	j := buildGeminiRequest(100, []Message{{Role: RoleUser, Content: "hi"}}, nil, true)
+	if j.GenerationConfig.ResponseMIMEType != "application/json" {
+		t.Fatalf("json mode must set responseMimeType, got %q", j.GenerationConfig.ResponseMIMEType)
+	}
+}
+
+func TestExtractJSONObject(t *testing.T) {
+	cases := map[string]string{
+		"```json\n{\"a\":1}\n```":    `{"a":1}`,
+		"here you go: {\"a\":1} ok":  `{"a":1}`,
+		"{\"a\":1}":                  `{"a":1}`,
+		"prefix {\"a\":{\"b\":2}} s": `{"a":{"b":2}}`,
+	}
+	for in, want := range cases {
+		if got := extractJSONObject(in); got != want {
+			t.Fatalf("extractJSONObject(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

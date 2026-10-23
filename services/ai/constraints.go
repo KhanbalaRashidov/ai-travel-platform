@@ -31,16 +31,16 @@ const extractSystemPrompt = `Extract trip constraints as STRICT JSON with keys: 
 // parses the JSON, and normalizes/validates it with safe defaults. Pure aside
 // from the injected LLM, so it is tested with MockLLM (no network).
 func ExtractConstraints(ctx context.Context, llm LLM, userText string) (TripConstraints, error) {
-	comp, err := llm.Complete(ctx, []Message{
+	comp, err := completeStructured(ctx, llm, []Message{
 		{Role: RoleSystem, Content: extractSystemPrompt},
 		{Role: RoleUser, Content: userText},
-	}, nil)
+	})
 	if err != nil {
 		return TripConstraints{}, err
 	}
 	var c TripConstraints
-	if err := json.Unmarshal([]byte(stripFences(comp.Content)), &c); err != nil {
-		return TripConstraints{}, fmt.Errorf("parse constraints: %w", err)
+	if err := json.Unmarshal([]byte(extractJSONObject(comp.Content)), &c); err != nil {
+		return TripConstraints{}, fmt.Errorf("parse constraints: %w (raw: %q)", err, snippet(comp.Content, 200))
 	}
 	c.normalize()
 	return c, nil

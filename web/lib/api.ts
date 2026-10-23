@@ -63,6 +63,10 @@ export class ApiError extends Error {
   }
 }
 
+// Default request timeout. AI calls (Gemini) can take tens of seconds, so this
+// is generous; it exists to fail cleanly instead of hanging forever.
+const REQUEST_TIMEOUT_MS = 60_000;
+
 async function parseEnvelope<T>(res: Response): Promise<T> {
   let json: Envelope<T> | null = null;
   try {
@@ -76,8 +80,25 @@ async function parseEnvelope<T>(res: Response): Promise<T> {
   return json.data as T;
 }
 
+// withTimeout runs a fetch under an AbortController; a timeout throws an
+// ApiError(408) so callers show a "try again" instead of hanging.
+async function withTimeout(url: string, init: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new ApiError(408, "request timed out");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await withTimeout(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -86,7 +107,7 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await withTimeout(`${BASE}${path}`, {});
   return parseEnvelope<T>(res);
 }
 

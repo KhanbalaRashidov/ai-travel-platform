@@ -35,7 +35,7 @@ type GeminiLLM struct {
 // empty model uses DefaultGeminiModel.
 func NewGemini(apiKey, model string, doer HTTPDoer) *GeminiLLM {
 	if doer == nil {
-		doer = &http.Client{Timeout: 60 * time.Second}
+		doer = &http.Client{Timeout: 45 * time.Second}
 	}
 	if model == "" {
 		model = DefaultGeminiModel
@@ -90,7 +90,8 @@ type geminiTool struct {
 }
 
 type geminiGenConfig struct {
-	MaxOutputTokens int `json:"maxOutputTokens,omitempty"`
+	MaxOutputTokens  int    `json:"maxOutputTokens,omitempty"`
+	ResponseMIMEType string `json:"responseMimeType,omitempty"`
 }
 
 type geminiReq struct {
@@ -119,8 +120,13 @@ type geminiResp struct {
 // request: system messages go to systemInstruction, roles become user/model,
 // and tool_use/tool_result map to functionCall/functionResponse parts.
 // Consecutive same-role turns are merged. Pure — unit-tested without the network.
-func buildGeminiRequest(maxTokens int, msgs []Message, tools []ToolSpec) geminiReq {
+func buildGeminiRequest(maxTokens int, msgs []Message, tools []ToolSpec, jsonMode bool) geminiReq {
 	req := geminiReq{GenerationConfig: geminiGenConfig{MaxOutputTokens: maxTokens}}
+	if jsonMode {
+		// Ask Gemini for raw JSON (no prose/fences) so structured extraction
+		// parses reliably.
+		req.GenerationConfig.ResponseMIMEType = "application/json"
+	}
 
 	var systemParts []string
 	for _, m := range msgs {
@@ -201,11 +207,22 @@ func parseGeminiResponse(body []byte) (Completion, geminiResp, error) {
 
 // Complete calls the Gemini generateContent endpoint.
 func (g *GeminiLLM) Complete(ctx context.Context, msgs []Message, tools []ToolSpec) (Completion, error) {
+	return g.complete(ctx, msgs, tools, false)
+}
+
+// CompleteJSON forces Gemini's JSON response mode (no tools), so callers that
+// need structured output get clean JSON without prose or code fences. Satisfies
+// the optional JSONCompleter interface.
+func (g *GeminiLLM) CompleteJSON(ctx context.Context, msgs []Message) (Completion, error) {
+	return g.complete(ctx, msgs, nil, true)
+}
+
+func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSpec, jsonMode bool) (Completion, error) {
 	if g.budget != nil && g.budget.Remaining() <= 0 {
 		return Completion{}, fmt.Errorf("ai budget exhausted (spent $%.4f of $%.2f)", g.budget.SpentUSD, g.budget.LimitUSD)
 	}
 
-	payload, err := json.Marshal(buildGeminiRequest(g.maxTokens, msgs, tools))
+	payload, err := json.Marshal(buildGeminiRequest(g.maxTokens, msgs, tools, jsonMode))
 	if err != nil {
 		return Completion{}, err
 	}

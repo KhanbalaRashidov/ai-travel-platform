@@ -29,18 +29,21 @@ const editSystemPrompt = `You convert a traveler's edit request into a STRICT JS
 	`Use only city names the user mentions. Output ONLY the JSON object, no prose.`
 
 // ExtractEdit asks the LLM to turn a free-text edit into a TripEdit and parses
-// it. Pure aside from the injected LLM, so it is tested with MockLLM.
+// it. It prefers the provider's JSON mode and tolerates wrapped output; on a
+// parse failure it returns an error carrying a short snippet of the raw reply
+// so the caller can log what the model actually said. Pure aside from the
+// injected LLM, so it is tested with MockLLM.
 func ExtractEdit(ctx context.Context, llm LLM, message, currentSummary string) (TripEdit, error) {
-	comp, err := llm.Complete(ctx, []Message{
+	comp, err := completeStructured(ctx, llm, []Message{
 		{Role: RoleSystem, Content: editSystemPrompt},
 		{Role: RoleUser, Content: "Current plan: " + currentSummary + "\nEdit request: " + message},
-	}, nil)
+	})
 	if err != nil {
 		return TripEdit{}, err
 	}
 	var e TripEdit
-	if err := json.Unmarshal([]byte(stripFences(comp.Content)), &e); err != nil {
-		return TripEdit{}, fmt.Errorf("parse edit: %w", err)
+	if err := json.Unmarshal([]byte(extractJSONObject(comp.Content)), &e); err != nil {
+		return TripEdit{}, fmt.Errorf("parse edit: %w (raw: %q)", err, snippet(comp.Content, 200))
 	}
 	return e, nil
 }
