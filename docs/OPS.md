@@ -43,6 +43,22 @@ the image stays lean. To enable, implement `Renderer` with a Chromium driver
 - Structured request logs via Fiber's logger; AI token/cost is logged per call.
 - `GET /api/v1/analytics/stats` returns privacy-safe aggregate event counts.
 
+## Backups & restore (Postgres)
+Migrations ship as scripts and are applied with `make migrate-up` as part of
+deploy (never against a shared DB from the app). Back up and verify restores:
+```bash
+# Nightly logical backup (cron):
+docker compose -f deploy/docker-compose.yml exec -T postgres \
+  pg_dump -U postgres ai_travel | gzip > backup_$(date +%F).sql.gz
+
+# Restore (into a fresh DB) and verify before cutover:
+gunzip -c backup_YYYY-MM-DD.sql.gz | \
+  docker compose -f deploy/docker-compose.yml exec -T postgres psql -U postgres ai_travel
+```
+Test a restore on a throwaway database periodically (the launch checklist tracks
+this). Redis and the fare cache are regenerable and need no backup. Keep dumps
+encrypted and off-host.
+
 ## Scaling notes
 - The planner engine is pure/stateless → horizontally scalable.
 - Prices use a hot (Redis) → warm (DB) → cold (fetch) flywheel; repeat lookups
