@@ -1,11 +1,10 @@
-// Package ai is the LLM orchestrator: it extracts constraints from user input,
-// calls tools (connectors + planner + knowledge) for real data, writes the
-// day-by-day narrative, and enforces guardrails so prices are never invented.
+// Package ai is the LLM orchestrator. It extracts trip constraints from user
+// input, calls tools (connectors + planner + knowledge) for REAL data, and
+// writes the itinerary narrative — but it never invents prices. Every number in
+// the final text is validated against the values the tools actually returned
+// (grounding); ungrounded prices are rejected and regenerated.
 //
-// Split-ready: implemented in E4.
+// The LLM sits behind an interface so it can be swapped (Sonnet/Haiku/Gemini)
+// and mocked in tests, so this whole package builds and tests without a network
+// or Docker. Split-ready (E4).
 package ai
-
-// Orchestrator is the AI entry point. Concrete implementation lands in E4.
-type Orchestrator interface {
-	// Orchestrator is a placeholder for the future AI API.
-}
