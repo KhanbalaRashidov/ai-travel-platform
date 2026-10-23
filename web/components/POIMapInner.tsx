@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, Popup, useMap } from "react-leaflet";
 import type { LatLngExpression, LatLngBoundsExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -27,6 +27,8 @@ export default function POIMapInner({ points = [] }: { points?: POIPoint[] }) {
   const pts = points.filter((p) => p.lat !== 0 || p.lng !== 0);
   const bounds: LatLngBoundsExpression = pts.map((p) => [p.lat, p.lng]) as [number, number][];
   const center: LatLngExpression = pts.length ? [pts[0].lat, pts[0].lng] : [41, 44];
+  // Connect the POIs in visit order so the map reads as one roadmap, not dots.
+  const path: LatLngExpression[] = pts.map((p) => [p.lat, p.lng]);
 
   return (
     <MapContainer
@@ -40,6 +42,12 @@ export default function POIMapInner({ points = [] }: { points?: POIPoint[] }) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      {path.length > 1 && (
+        <Polyline
+          positions={path}
+          pathOptions={{ color: "rgb(16 185 129)", weight: 3, opacity: 0.85, dashArray: "6 8" }}
+        />
+      )}
       {pts.map((p, i) => (
         <CircleMarker
           key={`${p.name}-${i}`}

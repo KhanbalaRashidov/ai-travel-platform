@@ -71,7 +71,14 @@ export function RoadmapCards({
     <div className="space-y-4">
       {points.length > 0 && <POIMap points={points} />}
 
-      <div className="space-y-3">
+      <div className="relative space-y-3 pl-8">
+        {/* Vertical rail connecting the whole roadmap (days read as one flow). */}
+        {roadmap.days.length > 0 && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-3 left-[13px] top-3 w-0.5 bg-gradient-to-b from-primary/50 via-primary/30 to-accent/40"
+          />
+        )}
         {roadmap.days.map((d, i) => {
           const isNewCity = d.city.toLowerCase() !== lastCity;
           lastCity = d.city.toLowerCase();
@@ -100,14 +107,15 @@ export function RoadmapCards({
               )}
 
               <div
-                className="animate-fade-up rounded-2xl border border-border bg-surface-2/40 p-4"
+                className="animate-fade-up relative rounded-2xl border border-border bg-surface-2/40 p-4"
                 style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
               >
+                {/* Day node sitting on the rail. */}
+                <span className="absolute -left-[26px] top-4 z-10 grid h-6 w-6 place-items-center rounded-full bg-primary text-xs font-bold text-primary-fg shadow-soft ring-2 ring-surface tabular-nums">
+                  {d.day}
+                </span>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-fg tabular-nums">
-                      {d.day}
-                    </span>
                     <span className="truncate text-sm font-semibold">
                       {labels.day(d.day)} · {d.city}
                       {d.title ? ` — ${d.title}` : ""}
