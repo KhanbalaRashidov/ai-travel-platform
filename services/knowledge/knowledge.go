@@ -1,12 +1,10 @@
-// Package knowledge is the self-growing knowledge base: it persists everything
-// found (destinations, costs, routes, POIs, FX) with source/fetched_at/ttl,
-// reuses it for future users, powers dynamic recommendations, and maintains a
-// popular-destinations ranking.
+// Package knowledge is the self-growing knowledge base. It is a write-through
+// cache of provenance-tagged facts (routes, FX, destinations) that the system
+// learns as users plan trips: data found once is stored and reused, missing
+// data is fetched (connectors/AI) then saved, and aggregate popularity powers
+// dynamic recommendations ("travelers like you chose ...").
 //
-// Split-ready: implemented in E6.
+// A Store has an in-memory implementation (tests / Docker-free dev) and a
+// Postgres implementation (production, backed by the 0002_knowledge tables).
+// Split-ready (E6).
 package knowledge
-
-// Store is the knowledge-base entry point. Concrete implementation lands in E6.
-type Store interface {
-	// Store is a placeholder for the future knowledge-base API.
-}
