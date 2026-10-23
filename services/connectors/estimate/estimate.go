@@ -91,6 +91,15 @@ func estimateLeg(km float64, mode conn.TransportMode) (float64, time.Duration, b
 		price := math.Round(0.03 * km)
 		dur := time.Duration((km / 65) * float64(time.Hour)) // ~65 km/h avg
 		return price, dur, true
+	case conn.ModeFerry:
+		// Ferries only make sense for short/medium hops (islands, straits);
+		// beyond that they are not a realistic option.
+		if km < 20 || km > 1500 {
+			return 0, 0, false
+		}
+		price := math.Round(0.06 * km)
+		dur := time.Duration((km / 35) * float64(time.Hour)) // ~35 km/h avg
+		return price, dur, true
 	}
 	return 0, 0, false
 }

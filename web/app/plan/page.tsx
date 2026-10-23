@@ -419,6 +419,9 @@ export default function PlanPage() {
         hrefLabel: t("res.searchInfo"),
         modeValue: legModes[`${l.from}|${l.to}`] ?? l.mode,
         onModeChange: (m: string) => changeLegMode(l.from, l.to, m),
+        unavailableNote: l.mode_unavailable
+          ? t("res.modeUnavailable", { m: t(`mode.${l.requested_mode}`) })
+          : undefined,
       }))
     : [];
 
@@ -427,6 +430,7 @@ export default function PlanPage() {
     { value: "flight", label: t("mode.flight") },
     { value: "train", label: t("mode.train") },
     { value: "bus", label: t("mode.bus") },
+    { value: "ferry", label: t("mode.ferry") },
   ];
 
   const mapPoints: MapPoint[] = plan
@@ -637,6 +641,7 @@ export default function PlanPage() {
                 <option value="flight">{t("mode.flight")}</option>
                 <option value="train">{t("mode.train")}</option>
                 <option value="bus">{t("mode.bus")}</option>
+                <option value="ferry">{t("mode.ferry")}</option>
               </Select>
             </Field>
             <Field label={t("plan.currency")}>

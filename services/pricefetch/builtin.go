@@ -34,6 +34,10 @@ var builtinEntries = []builtinEntry{
 	{"flixbus", "bus operator; ToS restricts scraping", "https://global.flixbus.com/search?departureCity={from}&arrivalCity={to}&rideDate={date}", []conn.TransportMode{conn.ModeBus}},
 	{"twelvego", "train/bus aggregator; ToS restricts scraping", "https://12go.asia/en/travel/{from}/{to}", []conn.TransportMode{conn.ModeTrain, conn.ModeBus}},
 	{"busbud", "bus aggregator; ToS restricts scraping", "https://www.busbud.com/en/bus-{from}-{to}", []conn.TransportMode{conn.ModeBus}},
+	{"trainline", "rail aggregator; ToS restricts scraping", "https://www.thetrainline.com/book/results?origin={from}&destination={to}&outboundDate={date}", []conn.TransportMode{conn.ModeTrain}},
+
+	// Ferry / sea crossings.
+	{"directferries", "ferry aggregator; ToS restricts scraping", "https://www.directferries.com/ferry-{from}-{to}.htm", []conn.TransportMode{conn.ModeFerry}},
 }
 
 // BuiltinSources returns the shipped source list wired to the given renderers.

@@ -238,6 +238,8 @@ export interface PlanLeg {
   url?: string;
   alternatives?: LegAlt[];
   fetched_at?: string;
+  requested_mode?: string; // set when the requested mode was unavailable
+  mode_unavailable?: boolean;
 }
 
 export interface HotelLine {

@@ -10,6 +10,7 @@ export interface TimelineLeg {
   hrefLabel?: string; // localized label for the link
   modeValue?: string; // current override selection (for the per-leg selector)
   onModeChange?: (mode: string) => void;
+  unavailableNote?: string; // shown when the requested mode wasn't available
 }
 
 export interface ModeOption {
@@ -99,6 +100,11 @@ export function RouteTimeline({
                   </>
                 )}
               </div>
+              {legs[i].unavailableNote && (
+                <span className="ml-1 self-center rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                  {legs[i].unavailableNote}
+                </span>
+              )}
             </div>
           )}
         </li>

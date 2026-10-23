@@ -204,6 +204,31 @@ func withCurrency(r PlanRequest, cur string) PlanRequest {
 	return r
 }
 
+func TestPlan_ModeUnavailableFallsBack(t *testing.T) {
+	p := newTestPlanner()
+	// Force a bus on Baku->Istanbul (~1560 km): bus is not viable that far, so
+	// the leg must fall back to a feasible mode and be flagged (not error out).
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Istanbul"}, Start: "Baku",
+		Mode: "cheapest", Tier: "standard", Nights: 1, Currency: "EUR",
+		Order:    []string{"Baku", "Istanbul"},
+		LegModes: map[string]string{"Baku|Istanbul": "bus"},
+	})
+	if err != nil {
+		t.Fatalf("plan should not error on an infeasible mode: %v", err)
+	}
+	if len(res.Legs) != 1 {
+		t.Fatalf("expected 1 leg, got %d", len(res.Legs))
+	}
+	leg := res.Legs[0]
+	if !leg.ModeUnavailable || leg.RequestedMode != "bus" {
+		t.Fatalf("expected bus flagged unavailable, got %+v", leg)
+	}
+	if leg.Mode == "bus" {
+		t.Fatalf("leg should have fallen back off bus, got mode=%s", leg.Mode)
+	}
+}
+
 func TestPlan_CityNightsOverride(t *testing.T) {
 	p := newTestPlanner()
 	res, err := p.Plan(context.Background(), "t1", PlanRequest{

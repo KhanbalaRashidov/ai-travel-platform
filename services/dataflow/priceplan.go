@@ -77,6 +77,10 @@ type LegQuote struct {
 	URL          string   `json:"url"` // real, route-prefilled deep-link
 	Alternatives []LegAlt `json:"alternatives,omitempty"`
 	FetchedAt    string   `json:"fetched_at,omitempty"`
+	// RequestedMode is the mode the user asked for when it was not available for
+	// this leg (e.g. a bus across a sea); Mode then holds the substitute used.
+	RequestedMode   string `json:"requested_mode,omitempty"`
+	ModeUnavailable bool   `json:"mode_unavailable,omitempty"`
 }
 
 // PlaceCoord is a city the client selected via autocomplete, with coordinates,
@@ -256,7 +260,7 @@ func max0(n int) int {
 
 // isValidLegMode reports whether m is an accepted per-leg override.
 func isValidLegMode(m string) bool {
-	return m == "cheapest" || m == "flight" || m == "train" || m == "bus"
+	return m == "cheapest" || m == "flight" || m == "train" || m == "bus" || m == "ferry"
 }
 
 // resolveMode maps "cheapest"/"" to a concrete mode for a fare lookup.
@@ -266,6 +270,8 @@ func resolveMode(mode string) conn.TransportMode {
 		return conn.ModeTrain
 	case "bus":
 		return conn.ModeBus
+	case "ferry":
+		return conn.ModeFerry
 	default:
 		return conn.ModeFlight
 	}
@@ -458,6 +464,16 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 			legMode = m
 		}
 		q, chain, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], legMode)
+		// Requested mode not available for this leg (e.g. a bus/ferry where the
+		// geography doesn't allow it): fall back to the cheapest feasible mode and
+		// flag it, instead of failing the whole plan (C6).
+		unavailable := false
+		requested := ""
+		if !ok && legMode != "" && legMode != "cheapest" {
+			requested = legMode
+			q, chain, tier, ok = p.cheapestLeg(ctx, tenantID, order[i], order[i+1], "cheapest")
+			unavailable = ok
+		}
 		if !ok {
 			return PlanResult{}, ErrLegUnavailable
 		}
@@ -470,7 +486,11 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if q.Estimated {
 			anyEstimated = true
 		}
-		legs = append(legs, p.legQuote(order[i], order[i+1], q, chain, tier, disp, cur, payable))
+		lq := p.legQuote(order[i], order[i+1], q, chain, tier, disp, cur, payable)
+		if unavailable {
+			lq.RequestedMode, lq.ModeUnavailable = requested, true
+		}
+		legs = append(legs, lq)
 		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 	}
 
