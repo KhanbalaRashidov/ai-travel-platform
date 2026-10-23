@@ -23,6 +23,7 @@ import {
   RouteDTO,
   sequence,
 } from "../../lib/api";
+import { LanguageSwitcher, LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
 
 interface Planned {
   cities: City[];
@@ -31,12 +32,14 @@ interface Planned {
 }
 
 export default function PlanPage() {
+  const { t, locale } = useI18n();
+
   const [selected, setSelected] = useState<string[]>(["BAK", "TBS", "IST"]);
   const [start, setStart] = useState("BAK");
   const [tier, setTier] = useState<Tier>("standard");
   const [pref, setPref] = useState<ModePref>("cheapest");
   const [nights, setNights] = useState(2);
-  const [currency, setCurrency] = useState("EUR");
+  const [currency, setCurrency] = useState<string>(LOCALE_CURRENCY[locale]);
 
   const [planned, setPlanned] = useState<Planned | null>(null);
   const [legs, setLegs] = useState<Array<{ from: string; to: string; mode: string; price: number }>>([]);
@@ -52,8 +55,6 @@ export default function PlanPage() {
     );
   }
 
-  // Re-price a fixed order. Does NOT re-sequence (refinement #2): called on
-  // tier/mode/nights/currency changes.
   const reprice = useCallback(
     async (p: Planned) => {
       const order = p.route.order;
@@ -67,11 +68,18 @@ export default function PlanPage() {
         const b = p.cities[order[i + 1]];
         const leg = legFor(a, b, pref);
         if (leg.price >= INF) {
-          setError(`"${pref}" bu marşrut üçün mümkün deyil (${a.name} → ${b.name}). Başqa nəqliyyat seçin.`);
+          setError(
+            t("err.modeImpossible", { mode: t(`mode.${pref}`), from: a.name, to: b.name })
+          );
           return;
         }
-        uiLegs.push({ from: a.name, to: b.name, mode: leg.mode, price: leg.price });
-        apiLegs.push({ from: order[i], to: order[i + 1], mode: leg.mode, price: { amount: leg.price, currency: "EUR" } });
+        uiLegs.push({ from: a.name, to: b.name, mode: t(`mode.${leg.mode}`), price: leg.price });
+        apiLegs.push({
+          from: order[i],
+          to: order[i + 1],
+          mode: leg.mode,
+          price: { amount: leg.price, currency: "EUR" },
+        });
       }
 
       const hotels: PricedHotel[] = order.map((idx) => ({
@@ -94,20 +102,20 @@ export default function PlanPage() {
         });
         setLegs(uiLegs);
         setBreakdown(b);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "qiymətləndirmə alınmadı");
+      } catch {
+        setError(t("err.price"));
       }
     },
-    [tier, pref, nights, currency]
+    [tier, pref, nights, currency, t]
   );
 
   async function onPlan() {
     if (selected.length < 2) {
-      setError("Ən azı 2 şəhər seçin.");
+      setError(t("err.minCities"));
       return;
     }
     if (!selected.includes(start)) {
-      setError("Başlanğıc şəhər seçilmiş şəhərlər arasında olmalıdır.");
+      setError(t("err.startInvalid"));
       return;
     }
     const cities = CITIES.filter((c) => selected.includes(c.code));
@@ -120,8 +128,8 @@ export default function PlanPage() {
       const p: Planned = { cities, route: res.best, alt: res.alt };
       setPlanned(p);
       await reprice(p);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "marşrut hesablanmadı");
+    } catch {
+      setError(t("err.sequence"));
       setPlanned(null);
     } finally {
       setLoading(false);
@@ -134,19 +142,22 @@ export default function PlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, pref, nights, currency]);
 
+  const variantLabel = (v: string) => (v === "open_jaw" ? t("res.openjaw") : t("res.roundtrip"));
   const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-bold">Ən sərfəli marşrut</h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Şəhərləri seç, sistem ən ucuz sıranı çıxarır; rahatlıq/nəqliyyat dəyişdikcə total anında yenilənir.
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{t("plan.title")}</h1>
+          <p className="mt-1 text-sm text-gray-500">{t("plan.subtitle")}</p>
+        </div>
+        <LanguageSwitcher />
+      </div>
 
-      {/* Wizard */}
       <section className="mt-6 space-y-4 rounded-lg border border-gray-200 p-4">
         <div>
-          <div className="text-sm font-medium">Şəhərlər</div>
+          <div className="text-sm font-medium">{t("plan.cities")}</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {CITIES.map((c) => (
               <button
@@ -166,7 +177,7 @@ export default function PlanPage() {
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <label className="text-sm">
-            Başlanğıc
+            {t("plan.start")}
             <select
               value={start}
               onChange={(e) => setStart(e.target.value)}
@@ -181,34 +192,34 @@ export default function PlanPage() {
           </label>
 
           <label className="text-sm">
-            Rahatlıq
+            {t("plan.comfort")}
             <select
               value={tier}
               onChange={(e) => setTier(e.target.value as Tier)}
               className="mt-1 w-full rounded border border-gray-300 p-1.5"
             >
-              <option value="budget">Budget (3★)</option>
-              <option value="standard">Standart (4★)</option>
-              <option value="vip">VIP (5★)</option>
+              <option value="budget">{t("tier.budget")}</option>
+              <option value="standard">{t("tier.standard")}</option>
+              <option value="vip">{t("tier.vip")}</option>
             </select>
           </label>
 
           <label className="text-sm">
-            Nəqliyyat
+            {t("plan.transport")}
             <select
               value={pref}
               onChange={(e) => setPref(e.target.value as ModePref)}
               className="mt-1 w-full rounded border border-gray-300 p-1.5"
             >
-              <option value="cheapest">Ən ucuz</option>
-              <option value="flight">Təyyarə</option>
-              <option value="train">Qatar</option>
-              <option value="bus">Avtobus</option>
+              <option value="cheapest">{t("mode.cheapest")}</option>
+              <option value="flight">{t("mode.flight")}</option>
+              <option value="train">{t("mode.train")}</option>
+              <option value="bus">{t("mode.bus")}</option>
             </select>
           </label>
 
           <label className="text-sm">
-            Gecə / şəhər
+            {t("plan.nights")}
             <input
               type="number"
               min={1}
@@ -226,10 +237,10 @@ export default function PlanPage() {
             disabled={loading}
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {loading ? "Hesablanır..." : "Marşrutu hesabla"}
+            {loading ? t("plan.calculating") : t("plan.calc")}
           </button>
           <label className="text-sm text-gray-600">
-            Valyuta{" "}
+            {t("plan.currency")}{" "}
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
@@ -249,14 +260,13 @@ export default function PlanPage() {
         <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
 
-      {/* Results */}
       {planned && breakdown && (
         <section className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Marşrut</h2>
+              <h2 className="font-semibold">{t("res.route")}</h2>
               <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {planned.route.variant === "open_jaw" ? "açıq-çənə" : "gediş-dönüş"}
+                {variantLabel(planned.route.variant)}
               </span>
             </div>
             <ol className="mt-3 space-y-2 text-sm">
@@ -273,29 +283,27 @@ export default function PlanPage() {
             </ol>
             {planned.alt && planned.alt.order && planned.alt.order.length > 0 && (
               <p className="mt-3 text-xs text-gray-400">
-                Alternativ ({planned.alt.variant === "open_jaw" ? "açıq-çənə" : "gediş-dönüş"}):
-                nəqliyyat ~{fmt(planned.alt.cost)} EUR
+                {t("res.alt")} ({variantLabel(planned.alt.variant)}): ~{fmt(planned.alt.cost)} EUR
               </p>
             )}
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
-            <h2 className="font-semibold">Canlı xərc ({breakdown.currency})</h2>
+            <h2 className="font-semibold">
+              {t("res.liveCost")} ({breakdown.currency})
+            </h2>
             <dl className="mt-3 space-y-1 text-sm">
-              <Row label="Nəqliyyat" value={fmt(breakdown.transport)} />
-              <Row label="Otellər" value={fmt(breakdown.hotels)} />
-              <Row label="Aktivliklər" value={fmt(breakdown.activities)} />
+              <Row label={t("res.transport")} value={fmt(breakdown.transport)} />
+              <Row label={t("res.hotels")} value={fmt(breakdown.hotels)} />
+              <Row label={t("res.activities")} value={fmt(breakdown.activities)} />
               <div className="mt-2 flex justify-between border-t pt-2 font-semibold">
-                <dt>Cəmi</dt>
+                <dt>{t("res.total")}</dt>
                 <dd>
                   {fmt(breakdown.total)} {breakdown.currency}
                 </dd>
               </div>
             </dl>
-            <p className="mt-3 text-xs text-gray-400">
-              Qiymətlər indikativdir (demo data). Rahatlıq/nəqliyyat/valyuta dəyişdikcə yalnız yenidən
-              qiymətləndirilir — marşrut sırası dəyişmir.
-            </p>
+            <p className="mt-3 text-xs text-gray-400">{t("res.disclaimer")}</p>
           </div>
         </section>
       )}
