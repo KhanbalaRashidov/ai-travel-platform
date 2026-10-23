@@ -159,7 +159,7 @@ export default function PlanPage() {
   // (re-sequence if the city set changed, else re-price the current order).
   function applyRefine(s: EditState) {
     const byName = (n: string) => cityList.find((c) => c.name.toLowerCase() === n.toLowerCase());
-    const newSelected = s.cities.map(byName).filter((c): c is City => !!c).map((c) => c.code);
+    const newSelected = (s.cities ?? []).map(byName).filter((c): c is City => !!c).map((c) => c.code);
     const newTier = (["budget", "standard", "vip"].includes(s.tier) ? s.tier : tier) as Tier;
     const newPref = (["cheapest", "flight", "train", "bus"].includes(s.mode) ? s.mode : pref) as ModePref;
     const newNights = s.nights > 0 ? s.nights : nights;
@@ -192,7 +192,7 @@ export default function PlanPage() {
   const coordsByName = (name: string) => cityList.find((c) => c.name.toLowerCase() === name.toLowerCase());
 
   const timelineLegs: TimelineLeg[] = plan
-    ? plan.legs.map((l) => ({
+    ? (plan.legs ?? []).map((l) => ({
         mode: l.mode,
         label: t(`mode.${l.mode}`),
         price: `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`,
@@ -200,7 +200,7 @@ export default function PlanPage() {
     : [];
 
   const mapPoints: MapPoint[] = plan
-    ? plan.order
+    ? (plan.order ?? [])
         .map((name) => {
           const c = coordsByName(name);
           return c ? { name, lat: c.lat, lng: c.lng } : null;
@@ -210,8 +210,8 @@ export default function PlanPage() {
 
   const aiBrief: ItineraryBrief | null = plan
     ? {
-        cities: plan.order,
-        legs: plan.legs.map((l) => ({ from: l.from, to: l.to, mode: l.mode, price: l.price })),
+        cities: plan.order ?? [],
+        legs: (plan.legs ?? []).map((l) => ({ from: l.from, to: l.to, mode: l.mode, price: l.price })),
         nights: plan.nights,
         currency: plan.currency,
         transport_total: plan.transport,
@@ -349,7 +349,7 @@ export default function PlanPage() {
                   <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
                 </div>
                 <div className="mt-4">
-                  <RouteTimeline stops={plan.order} legs={timelineLegs} />
+                  <RouteTimeline stops={plan.order ?? []} legs={timelineLegs} />
                 </div>
                 {plan.alt_variant && (
                   <p className="mt-4 border-t border-border pt-3 text-xs text-muted">

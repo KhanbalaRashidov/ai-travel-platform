@@ -76,7 +76,7 @@ export function AIPanel({
   // Render change codes ("mode:cheapest", "removed:Istanbul", "nights:3") as a
   // localized, human-readable confirmation.
   function describeChanges(changed: string[]): string {
-    if (changed.length === 0) return t("ai.ch.none");
+    if (!changed || changed.length === 0) return t("ai.ch.none");
     const parts = changed.map((code) => {
       const idx = code.indexOf(":");
       const k = idx >= 0 ? code.slice(0, idx) : code;

@@ -10,12 +10,12 @@ export interface CostSegment {
 // Donut chart drawn with stacked SVG circle strokes (one arc per segment) plus a
 // legend. The total sits in the hole. Pure SVG — no chart dependency.
 export function CostDonut({
-  segments,
+  segments = [],
   total,
   currency,
   fmt,
 }: {
-  segments: CostSegment[];
+  segments?: CostSegment[];
   total: number;
   currency: string;
   fmt: (n: number) => string;

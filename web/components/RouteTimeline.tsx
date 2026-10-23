@@ -11,11 +11,11 @@ export interface TimelineLeg {
 // Vertical, visual route: numbered stops connected by transport legs that carry
 // a mode icon and the leg price. Each row fades up in sequence.
 export function RouteTimeline({
-  stops,
-  legs,
+  stops = [],
+  legs = [],
 }: {
-  stops: string[];
-  legs: TimelineLeg[];
+  stops?: string[];
+  legs?: TimelineLeg[];
 }) {
   return (
     <ol className="relative">

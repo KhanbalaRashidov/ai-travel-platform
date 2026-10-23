@@ -28,10 +28,10 @@ function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
 }
 
 export default function RouteMapInner({
-  points,
+  points = [],
   closed,
 }: {
-  points: MapPoint[];
+  points?: MapPoint[];
   closed: boolean;
 }) {
   const path: LatLngExpression[] = points.map((p) => [p.lat, p.lng]);

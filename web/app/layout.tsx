@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Sora } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "../lib/i18n";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext", "cyrillic"],
@@ -35,7 +36,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body className="font-sans antialiased">
-        <LocaleProvider>{children}</LocaleProvider>
+        <LocaleProvider>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </LocaleProvider>
       </body>
     </html>
   );
