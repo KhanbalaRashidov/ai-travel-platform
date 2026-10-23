@@ -82,8 +82,9 @@ func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
 			log.Printf("AI disabled: provider=gemini but GEMINI_API_KEY not set (AI endpoints will return 503)")
 			return nil, nil
 		}
-		llm := ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiModel, nil).WithBudget(budget).WithMeter(meter)
-		log.Printf("AI enabled: provider=gemini model=%s (free)", llm.Model())
+		llm := ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiModel, nil).
+			WithBudget(budget).WithMeter(meter).WithFallback(cfg.GeminiFallbackModel)
+		log.Printf("AI enabled: provider=gemini model=%s fallback=%q (free)", llm.Model(), cfg.GeminiFallbackModel)
 		return llm, llm // one free model serves both reasoning and bulk
 	}
 }

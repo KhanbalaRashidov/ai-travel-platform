@@ -12,6 +12,10 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 )
 
+// busyMsg is returned when the provider is momentarily overloaded/rate-limited
+// (transient 429/503); the client shows a "try again shortly" state.
+const busyMsg = "AI service is busy, try again shortly"
+
 // AIHandler serves the LLM features: the itinerary writer (bulk model), chat
 // (reasoning model + guardrail, with planner/flywheel tools), and the
 // conversational refine loop. When the Anthropic key is unset both LLMs are nil
@@ -54,7 +58,7 @@ type itineraryReq struct {
 // may not invent prices: any ungrounded amount is surfaced as a violation.
 func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 	if h.bulk == nil {
-		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured (set ANTHROPIC_API_KEY)")
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured")
 	}
 	var req itineraryReq
 	if err := c.BodyParser(&req); err != nil || len(req.Cities) == 0 {
@@ -71,6 +75,9 @@ func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 	}
 	res, err := ai.WriteItinerary(c.Context(), h.bulk, brief, 1)
 	if err != nil {
+		if ai.IsTransient(err) {
+			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
+		}
 		return httpx.Err(c, fiber.StatusBadGateway, "itinerary generation failed")
 	}
 	return httpx.OK(c, res)
@@ -88,7 +95,7 @@ const chatSystem = "You are a helpful, concise travel assistant for an advisory-
 // with an empty grounding set, so any price the model emits is flagged.
 func (h *AIHandler) Chat(c *fiber.Ctx) error {
 	if h.primary == nil {
-		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured (set ANTHROPIC_API_KEY)")
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured")
 	}
 	var req chatReq
 	if err := c.BodyParser(&req); err != nil || req.Message == "" {
@@ -97,6 +104,9 @@ func (h *AIHandler) Chat(c *fiber.Ctx) error {
 	orch := ai.NewOrchestrator(h.primary, 4, 1, h.tools...)
 	res, err := orch.Run(c.Context(), chatSystem, req.Message)
 	if err != nil {
+		if ai.IsTransient(err) {
+			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
+		}
 		return httpx.Err(c, fiber.StatusBadGateway, "chat failed")
 	}
 	return httpx.OK(c, res)
@@ -119,7 +129,7 @@ type refineResp struct {
 // and cost panel update live. The LLM never computes routes or prices.
 func (h *AIHandler) Refine(c *fiber.Ctx) error {
 	if h.primary == nil {
-		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured (set ANTHROPIC_API_KEY)")
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured")
 	}
 	var req refineReq
 	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Message) == "" {
@@ -131,6 +141,9 @@ func (h *AIHandler) Refine(c *fiber.Ctx) error {
 	if err != nil {
 		// The error carries a masked/raw snippet of the model reply for diagnosis.
 		log.Printf("ai refine: failed in %s: %v", elapsed.Round(time.Millisecond), err)
+		if ai.IsTransient(err) {
+			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
+		}
 		return httpx.Err(c, fiber.StatusBadGateway, "could not understand the edit")
 	}
 	log.Printf("ai refine: ok in %s", elapsed.Round(time.Millisecond))

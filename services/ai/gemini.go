@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -24,11 +25,15 @@ const DefaultGeminiModel = "gemini-2.0-flash"
 type GeminiLLM struct {
 	apiKey    string
 	model     string
+	fallback  string // optional second model tried when the primary stays overloaded
 	maxTokens int
 	baseURL   string
 	http      HTTPDoer
 	budget    *Budget
 	meter     func(model string, u Usage)
+	// delays are the backoff waits before each retry (len+1 = max attempts).
+	delays []time.Duration
+	sleep  func(d time.Duration) // injectable for tests
 }
 
 // NewGemini builds a Gemini adapter. Pass nil doer for a default HTTP client;
@@ -40,7 +45,16 @@ func NewGemini(apiKey, model string, doer HTTPDoer) *GeminiLLM {
 	if model == "" {
 		model = DefaultGeminiModel
 	}
-	return &GeminiLLM{apiKey: apiKey, model: model, maxTokens: defaultMaxTokens, baseURL: geminiBaseURL, http: doer}
+	return &GeminiLLM{
+		apiKey:    apiKey,
+		model:     model,
+		maxTokens: defaultMaxTokens,
+		baseURL:   geminiBaseURL,
+		http:      doer,
+		// Up to 3 attempts; only transient (429/503) errors trigger a retry.
+		delays: []time.Duration{500 * time.Millisecond, 1500 * time.Millisecond},
+		sleep:  time.Sleep,
+	}
 }
 
 // WithBudget attaches a shared budget (Gemini cost is ~0, so this rarely trips).
@@ -48,6 +62,9 @@ func (g *GeminiLLM) WithBudget(b *Budget) *GeminiLLM { g.budget = b; return g }
 
 // WithMeter attaches a usage callback for token logging.
 func (g *GeminiLLM) WithMeter(f func(model string, u Usage)) *GeminiLLM { g.meter = f; return g }
+
+// WithFallback sets a second model to try when the primary stays overloaded.
+func (g *GeminiLLM) WithFallback(model string) *GeminiLLM { g.fallback = model; return g }
 
 // Model returns the configured model name.
 func (g *GeminiLLM) Model() string { return g.model }
@@ -221,13 +238,58 @@ func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSp
 	if g.budget != nil && g.budget.Remaining() <= 0 {
 		return Completion{}, fmt.Errorf("ai budget exhausted (spent $%.4f of $%.2f)", g.budget.SpentUSD, g.budget.LimitUSD)
 	}
-
 	payload, err := json.Marshal(buildGeminiRequest(g.maxTokens, msgs, tools, jsonMode))
 	if err != nil {
 		return Completion{}, err
 	}
+
+	comp, err := g.attempt(ctx, g.model, payload)
+	// If the primary model stays overloaded, try the fallback once (with its own
+	// retry budget) before giving up.
+	if err != nil && IsTransient(err) && g.fallback != "" && g.fallback != g.model {
+		if c2, e2 := g.attempt(ctx, g.fallback, payload); e2 == nil {
+			return c2, nil
+		}
+	}
+	return comp, err
+}
+
+// attempt performs one logical call to a model, retrying only on transient
+// (429/503) errors with exponential backoff + jitter. 4xx and parse errors
+// return immediately. It stops early if the context is cancelled.
+func (g *GeminiLLM) attempt(ctx context.Context, model string, payload []byte) (Completion, error) {
+	var lastErr error
+	for i := 0; i <= len(g.delays); i++ {
+		if i > 0 {
+			if err := g.wait(ctx, g.delays[i-1]); err != nil {
+				return Completion{}, err
+			}
+		}
+		comp, err := g.doOnce(ctx, model, payload)
+		if err == nil {
+			return comp, nil
+		}
+		lastErr = err
+		if !IsTransient(err) {
+			return Completion{}, err // 4xx / parse -> no retry
+		}
+	}
+	return Completion{}, lastErr // exhausted retries; lastErr is a transient *APIError
+}
+
+// wait sleeps for d plus up to 25% jitter, aborting if the context is cancelled.
+func (g *GeminiLLM) wait(ctx context.Context, d time.Duration) error {
+	if d > 0 {
+		jitter := time.Duration(rand.Int63n(int64(d)/4 + 1))
+		g.sleep(d + jitter)
+	}
+	return ctx.Err()
+}
+
+// doOnce performs a single HTTP call + parse, metering on success.
+func (g *GeminiLLM) doOnce(ctx context.Context, model string, payload []byte) (Completion, error) {
 	// The key is a query param; keep it out of the body/logs.
-	u := fmt.Sprintf("%s/%s:generateContent?key=%s", g.baseURL, g.model, g.apiKey)
+	u := fmt.Sprintf("%s/%s:generateContent?key=%s", g.baseURL, model, g.apiKey)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(payload))
 	if err != nil {
 		return Completion{}, err
@@ -244,7 +306,7 @@ func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSp
 		return Completion{}, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Completion{}, fmt.Errorf("gemini %d: %s", resp.StatusCode, g.mask(truncate(string(raw), 300)))
+		return Completion{}, &APIError{Status: resp.StatusCode, Message: g.mask(truncate(string(raw), 300))}
 	}
 
 	comp, r, err := parseGeminiResponse(raw)
@@ -253,17 +315,17 @@ func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSp
 	}
 
 	// Gemini's free tier -> treat cost as ~0 (route priced at 0).
-	route := ModelRoute{Name: g.model}
-	u2 := Usage{
+	route := ModelRoute{Name: model}
+	usage := Usage{
 		InputTokens:  r.UsageMetadata.PromptTokenCount,
 		OutputTokens: r.UsageMetadata.CandidatesTokenCount,
 		CostUSD:      EstimateCostUSD(route, r.UsageMetadata.PromptTokenCount, r.UsageMetadata.CandidatesTokenCount),
 	}
 	if g.budget != nil {
-		g.budget.Add(u2.CostUSD)
+		g.budget.Add(usage.CostUSD)
 	}
 	if g.meter != nil {
-		g.meter(g.model, u2)
+		g.meter(model, usage)
 	}
 	return comp, nil
 }

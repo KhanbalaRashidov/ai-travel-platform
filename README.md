@@ -41,6 +41,8 @@ docker compose -f deploy/docker-compose.yml exec api printenv | grep -E 'GEMINI|
 ```
 Without the selected provider's key the stack still runs; the AI endpoints return 503 ("AI not configured"). Explicit `environment:` values (DATABASE_URL/REDIS_URL/JWT_*) override anything in `.env`, so the container keeps its service-DNS URLs.
 
+Transient provider overload (Gemini 503/429 "high demand") is retried a few times with exponential backoff + jitter; if it persists the endpoint returns 503 "AI service is busy, try again shortly" and the UI shows a retry. Set `GEMINI_FALLBACK_MODEL` to have a second model tried when the primary stays overloaded.
+
 ## Monorepo layout
 ```
 services/   Go app (gateway = HTTP entry; planner/connectors/knowledge/ai = split-ready domains)

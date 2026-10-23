@@ -23,11 +23,12 @@ type Config struct {
 	// LLMProvider selects the backend ("gemini" default, free; or "claude").
 	// When the selected provider's key is empty, the AI endpoints report "not
 	// configured" and the rest of the platform runs normally.
-	LLMProvider     string
-	GeminiAPIKey    string
-	GeminiModel     string
-	AnthropicAPIKey string
-	AIBudgetUSD     float64
+	LLMProvider         string
+	GeminiAPIKey        string
+	GeminiModel         string
+	GeminiFallbackModel string
+	AnthropicAPIKey     string
+	AIBudgetUSD         float64
 }
 
 // Load reads configuration from the environment, applying sensible dev defaults.
@@ -43,11 +44,12 @@ func Load() Config {
 		JWTSecret:   getenv("JWT_SECRET", "dev-insecure-change-me"),
 		JWTTTL:      time.Duration(getenvInt("JWT_TTL_HOURS", 72)) * time.Hour,
 
-		LLMProvider:     getenv("LLM_PROVIDER", "gemini"),
-		GeminiAPIKey:    os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:     getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
-		AIBudgetUSD:     getenvFloat("AI_BUDGET_USD", 100),
+		LLMProvider:         getenv("LLM_PROVIDER", "gemini"),
+		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:         getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+		GeminiFallbackModel: os.Getenv("GEMINI_FALLBACK_MODEL"),
+		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
+		AIBudgetUSD:         getenvFloat("AI_BUDGET_USD", 100),
 	}
 }
 

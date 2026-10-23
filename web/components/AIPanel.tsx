@@ -44,13 +44,20 @@ export function AIPanel({
   const [chatLoading, setChatLoading] = useState(false);
   const [chatErr, setChatErr] = useState<string | null>(null);
 
-  // Returns true when the error was a 503 and the panel switched to AI-off.
+  // A 503 "not configured" means the server has no AI key -> AI-off panel.
+  // A transient 503/429 ("busy") is NOT off; the caller shows a busy message.
   function handledAsOff(e: unknown): boolean {
-    if (e instanceof ApiError && e.status === 503) {
+    if (e instanceof ApiError && e.status === 503 && /not configured/i.test(e.message)) {
       setAiOff(true);
       return true;
     }
     return false;
+  }
+
+  // Map an error to the right user message (busy vs generic).
+  function errMessage(e: unknown): string {
+    if (e instanceof ApiError && (e.status === 503 || e.status === 429)) return t("ai.busy");
+    return t("ai.error");
   }
 
   async function generate() {
@@ -60,7 +67,7 @@ export function AIPanel({
     try {
       setItin(await itineraryApi(brief));
     } catch (e) {
-      if (!handledAsOff(e)) setItinErr(t("ai.error"));
+      if (!handledAsOff(e)) setItinErr(errMessage(e));
     } finally {
       setItinLoading(false);
     }
@@ -96,7 +103,7 @@ export function AIPanel({
       setMessages((m) => [...m, { role: "assistant", text: describeChanges(r.changed) }]);
       onRefine(r.state, r.changed);
     } catch (e) {
-      if (!handledAsOff(e)) setChatErr(t("ai.error"));
+      if (!handledAsOff(e)) setChatErr(errMessage(e));
     } finally {
       setChatLoading(false);
     }
