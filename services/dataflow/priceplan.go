@@ -370,6 +370,30 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 	}
 
+	// Round-trip: price the return leg (last -> start) so the total reflects the
+	// journey home, matching the round-trip variant and the closed map loop.
+	if variant == string(planner.RoundTrip) && len(order) >= 2 {
+		from, to := order[len(order)-1], order[0]
+		rm := req.Mode
+		if m, ok := req.LegModes[from+"|"+to]; ok && isValidLegMode(m) {
+			rm = m
+		}
+		if q, tier, ok := p.cheapestLeg(ctx, tenantID, from, to, rm); ok {
+			groupEUR := q.Price.Amount * payable
+			if disp, err := p.conv.Convert(groupEUR, q.Price.Currency, cur); err == nil {
+				if q.Estimated {
+					anyEstimated = true
+				}
+				legs = append(legs, LegQuote{
+					From: from, To: to, Mode: string(q.Mode),
+					Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
+					FetchedAt: fetchedAtStr(q.FetchedAt),
+				})
+				priced = append(priced, planner.PricedLeg{From: len(order) - 1, To: 0, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
+			}
+		}
+	}
+
 	// Nights are driven by the dates (single source of truth): totalNights =
 	// return - depart, split across the cities via AllocateNights. Without dates
 	// we fall back to req.Nights per city.

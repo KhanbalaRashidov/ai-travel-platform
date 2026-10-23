@@ -109,6 +109,26 @@ func TestPlan_PerLegModeOverride(t *testing.T) {
 	}
 }
 
+func TestPlan_RoundTripReturnLeg(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Tbilisi"}, Start: "Baku", Mode: "flight",
+		Tier: "standard", Nights: 1, Currency: "EUR",
+		Order: []string{"Baku", "Tbilisi"}, Variant: "round_trip",
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	// Round-trip = out + return => 2 legs for 2 cities (open-jaw would be 1).
+	if len(res.Legs) != 2 {
+		t.Fatalf("round-trip should include the return leg, got %d legs", len(res.Legs))
+	}
+	last := res.Legs[len(res.Legs)-1]
+	if last.From != "Tbilisi" || last.To != "Baku" {
+		t.Fatalf("return leg should be Tbilisi -> Baku, got %s -> %s", last.From, last.To)
+	}
+}
+
 func TestPlan_PassengerScaling(t *testing.T) {
 	p := newTestPlanner()
 	mk := func(adults int) PlanResult {
