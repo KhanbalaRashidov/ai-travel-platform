@@ -588,6 +588,25 @@ export default function PlanPage() {
         {/* Results */}
         {plan && (
           <section className="mt-6 space-y-4">
+            {/* Trip summary header */}
+            <Card className="animate-fade-up flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <span className="font-semibold">{t("res.nights", { n: plan.nights })}</span>
+                <span className="text-muted">·</span>
+                <span>{(plan.hotel_lines ?? []).length} {t("plan.cities")}</span>
+                <span className="text-muted">·</span>
+                <span className="font-display text-lg font-bold">
+                  {fmt(plan.total)} {plan.currency}
+                </span>
+                {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
+                  <span className="text-muted">
+                    ({fmt(plan.per_person)} {plan.currency} / {t("res.perPerson")})
+                  </span>
+                )}
+              </div>
+              <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
+            </Card>
+
             <div className="flex flex-wrap justify-end gap-2 print:hidden">
               <Button variant="ghost" onClick={share}>
                 {copied ? t("res.copied") : t("res.share")}
