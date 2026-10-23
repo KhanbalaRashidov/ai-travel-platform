@@ -51,6 +51,41 @@ func TestParsePOIs_Limit(t *testing.T) {
 	}
 }
 
+func TestEnrichment_ImageWebsiteWiki(t *testing.T) {
+	body := `{"elements":[
+		{"lat":41.0,"lon":44.8,"tags":{"name":"Narikala","tourism":"attraction",
+		  "wikimedia_commons":"File:Narikala fortress.jpg","website":"https://narikala.ge",
+		  "wikipedia":"en:Narikala"}},
+		{"lat":41.1,"lon":44.9,"tags":{"name":"Direct Image","tourism":"artwork",
+		  "image":"https://example.org/a.jpg"}}
+	]}`
+	pois, err := parsePOIs([]byte(body), "Tbilisi", 10, conn.Provenance{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var narikala, direct conn.POI
+	for _, p := range pois {
+		switch p.Name {
+		case "Narikala":
+			narikala = p
+		case "Direct Image":
+			direct = p
+		}
+	}
+	if !strings.HasPrefix(narikala.Image, "https://commons.wikimedia.org/wiki/Special:FilePath/") {
+		t.Fatalf("commons image not resolved: %q", narikala.Image)
+	}
+	if narikala.Website != "https://narikala.ge" {
+		t.Fatalf("website lost: %q", narikala.Website)
+	}
+	if narikala.Wiki != "https://en.wikipedia.org/wiki/Narikala" {
+		t.Fatalf("wiki URL wrong: %q", narikala.Wiki)
+	}
+	if direct.Image != "https://example.org/a.jpg" {
+		t.Fatalf("direct image lost: %q", direct.Image)
+	}
+}
+
 func TestBuildQuery_HasBBoxAndTags(t *testing.T) {
 	q := buildQuery(conn.LatLng{Lat: 41.0, Lng: 28.9})
 	if !strings.Contains(q, "out:json") || !strings.Contains(q, "tourism") || !strings.Contains(q, "historic") {

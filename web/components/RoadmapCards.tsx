@@ -3,6 +3,7 @@
 import { Roadmap } from "../lib/api";
 import { PinIcon } from "./icons";
 import { POIMap, POIPoint } from "./POIMap";
+import { CityPOIs } from "./CityPOIs";
 
 // mapsLink builds a real Google Maps place search for a POI (opens the actual
 // place, never an empty search).
@@ -70,6 +71,7 @@ export function RoadmapCards({
                     )}
                   </div>
                   {info.summary && <p className="mt-1 text-sm leading-relaxed text-muted">{info.summary}</p>}
+                  <CityPOIs city={info.city} />
                 </div>
               )}
 

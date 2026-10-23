@@ -129,6 +129,9 @@ func parsePOIs(body []byte, city string, limit int, prov conn.Provenance) ([]con
 			Category:   category(el.Tags),
 			Lat:        el.Lat,
 			Lng:        el.Lon,
+			Image:      osmImage(el.Tags),
+			Website:    firstNonEmpty(el.Tags["website"], el.Tags["url"], el.Tags["contact:website"]),
+			Wiki:       wikiURL(el.Tags["wikipedia"]),
 			Provenance: prov,
 		})
 	}
@@ -137,6 +140,40 @@ func parsePOIs(body []byte, city string, limit int, prov conn.Provenance) ([]con
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// osmImage returns a free image URL from OSM tags: a direct `image` URL, or a
+// Wikimedia Commons file resolved via Special:FilePath (returns the actual bytes).
+func osmImage(tags map[string]string) string {
+	if img := strings.TrimSpace(tags["image"]); strings.HasPrefix(img, "http") {
+		return img
+	}
+	commons := strings.TrimSpace(tags["wikimedia_commons"])
+	if strings.HasPrefix(commons, "File:") {
+		file := strings.TrimPrefix(commons, "File:")
+		return "https://commons.wikimedia.org/wiki/Special:FilePath/" + url.PathEscape(file) + "?width=480"
+	}
+	return ""
+}
+
+// wikiURL turns an OSM `wikipedia` tag ("en:Narikala Fortress") into a real
+// article URL. Returns "" when the tag is missing or malformed.
+func wikiURL(tag string) string {
+	tag = strings.TrimSpace(tag)
+	lang, title, ok := strings.Cut(tag, ":")
+	if !ok || lang == "" || strings.TrimSpace(title) == "" {
+		return ""
+	}
+	return "https://" + lang + ".wikipedia.org/wiki/" + url.PathEscape(strings.ReplaceAll(strings.TrimSpace(title), " ", "_"))
 }
 
 // category picks a human-friendly category from OSM tags.

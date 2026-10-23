@@ -138,6 +138,24 @@ export function searchPlaces(q: string, locale = "en"): Promise<Place[]> {
   return getJSON(`/data/places?q=${encodeURIComponent(q)}&locale=${encodeURIComponent(locale)}`);
 }
 
+// Real, open-data points of interest for a city (GET /data/poi) — OSM Overpass,
+// provenance-tagged (not estimated). Image/website/wiki present when OSM has them.
+export interface POIItem {
+  city: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  image?: string;
+  website?: string;
+  wiki?: string;
+  provenance?: { source: string; fetched_at?: string; estimated?: boolean };
+}
+
+export function fetchPOIs(city: string, limit = 8): Promise<POIItem[]> {
+  return getJSON(`/data/poi?city=${encodeURIComponent(city)}&limit=${limit}`);
+}
+
 // track records a privacy-safe aggregate event (fire-and-forget, never throws).
 export function track(name: string): void {
   try {

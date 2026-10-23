@@ -60,6 +60,9 @@ type POI struct {
 	Category   string  `json:"category"`
 	Lat        float64 `json:"lat"`
 	Lng        float64 `json:"lng"`
+	Image      string  `json:"image,omitempty"`   // free image URL (OSM image / Wikimedia Commons)
+	Website    string  `json:"website,omitempty"` // official site, when tagged
+	Wiki       string  `json:"wiki,omitempty"`    // Wikipedia article URL, when tagged
 	Provenance `json:"provenance"`
 }
 
