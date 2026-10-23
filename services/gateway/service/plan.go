@@ -23,3 +23,8 @@ func (s *PlanService) Price(in planner.PlanInput, rates map[string]float64) (pla
 func (s *PlanService) CompareLegs(legs []planner.LegInput) ([]planner.LegComparison, error) {
 	return planner.CompareLegs(legs)
 }
+
+// CompareObjectives contrasts the cost-optimal and comfort-optimal routes.
+func (s *PlanService) CompareObjectives(costM, durationM planner.Matrix, start, end int) (planner.ObjectiveComparison, error) {
+	return planner.CompareObjectives(costM, durationM, start, end)
+}

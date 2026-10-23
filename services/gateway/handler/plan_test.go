@@ -19,6 +19,7 @@ func planApp() *fiber.App {
 	app.Post("/plan/sequence", h.Sequence)
 	app.Post("/plan/price", h.Price)
 	app.Post("/plan/legs", h.Legs)
+	app.Post("/plan/compare", h.Compare)
 	return app
 }
 
@@ -96,5 +97,23 @@ func TestLegsEndpoint(t *testing.T) {
 	}
 	if fastest["mode"] != "flight" {
 		t.Fatalf("expected fastest flight, got %v", fastest["mode"])
+	}
+}
+
+func TestCompareEndpoint(t *testing.T) {
+	app := planApp()
+	body := `{
+		"cost_matrix":[[0,1,9],[1,0,1],[9,1,0]],
+		"duration_matrix":[[0,50,10],[50,0,50],[10,50,0]],
+		"start":0,"end":-1
+	}`
+	out := doJSON(t, app, "/plan/compare", body)
+	data, _ := out["data"].(map[string]any)
+	co, _ := data["cost_optimal"].(map[string]any)
+	if co["cost"].(float64) != 2 {
+		t.Fatalf("expected cost_optimal cost 2, got %v", co["cost"])
+	}
+	if _, ok := data["money_saved"].(float64); !ok {
+		t.Fatalf("expected money_saved number, got %v", data["money_saved"])
 	}
 }

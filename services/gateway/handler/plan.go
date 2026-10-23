@@ -95,3 +95,30 @@ func (h *PlanHandler) Legs(c *fiber.Ctx) error {
 	}
 	return httpx.OK(c, res)
 }
+
+type compareReq struct {
+	CostMatrix     planner.Matrix `json:"cost_matrix"`
+	DurationMatrix planner.Matrix `json:"duration_matrix"`
+	Start          int            `json:"start"`
+	End            *int           `json:"end"`
+}
+
+// Compare handles POST /plan/compare: cost-optimal vs comfort-optimal route.
+func (h *PlanHandler) Compare(c *fiber.Ctx) error {
+	var req compareReq
+	if err := c.BodyParser(&req); err != nil {
+		return httpx.Err(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	if len(req.CostMatrix) == 0 || len(req.DurationMatrix) == 0 {
+		return httpx.Err(c, fiber.StatusBadRequest, "cost_matrix and duration_matrix are required")
+	}
+	end := -1
+	if req.End != nil {
+		end = *req.End
+	}
+	cmp, err := h.svc.CompareObjectives(req.CostMatrix, req.DurationMatrix, req.Start, end)
+	if err != nil {
+		return httpx.Err(c, fiber.StatusUnprocessableEntity, err.Error())
+	}
+	return httpx.OK(c, cmp)
+}
