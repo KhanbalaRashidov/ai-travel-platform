@@ -10,10 +10,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	migrations "github.com/KhanbalaRashidov/ai-travel-platform/db"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/auth"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/cache"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/config"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/db"
+	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/migrate"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
@@ -28,6 +30,11 @@ func main() {
 		log.Fatalf("postgres: %v", err)
 	}
 	defer pool.Close()
+
+	// Zero-touch deploy: apply embedded migrations on boot (idempotent, fail-fast).
+	if err := migrate.Apply(ctx, pool, migrations.FS); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
 
 	rdb, err := cache.NewRedis(cfg.RedisURL)
 	if err != nil {

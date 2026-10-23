@@ -14,15 +14,15 @@ AI-based **informational** multi-country trip planner (advisory only — no paym
 ## Architecture
 Clean layering: **handler → service → repository** (DB access only in the repository layer).
 
-## Local dev
+## Local dev / deploy — one command
 ```bash
-cp .env.example .env            # fill values
-docker compose -f deploy/docker-compose.yml up -d   # Postgres + Redis (+ api, web)
-# apply migrations to the LOCAL dev DB only (ephemeral):
-make migrate-up
-# run API locally (alternative to the api container):
-make run-api
-# run web:
+cp .env.example .env            # fill values (all optional to boot)
+docker compose -f deploy/docker-compose.yml up -d   # Postgres + Redis + api + web
+```
+That's it. The api applies its embedded DB migrations automatically on boot
+(idempotent, fail-fast) — no `make`/`psql` step. Run pieces locally if you want:
+```bash
+make run-api                    # API outside the container
 cd web && npm install && npm run dev
 ```
 

@@ -5,18 +5,18 @@ Go (Fiber) API + Next.js web + PostgreSQL + Redis, as a modular monolith.
 Everything runs via Docker Compose on the operator's machine (developed/tested
 on macOS).
 
-## Run locally (Mac)
+## Run / deploy (Mac) — one command
 ```bash
 cp .env.example .env          # fill the values you want (all optional to boot)
 docker compose -f deploy/docker-compose.yml up -d --build
-make migrate-up               # apply 0001..0003 to the LOCAL dev DB only
 curl :8080/health             # {status:ok}
 curl :8080/ready              # db + redis
 # web: http://localhost:3000
 ```
-The API loads the repo-root `.env` via `env_file` (no `--env-file` needed).
-Migrations are **scripts**; apply them only to the ephemeral local dev Postgres,
-never to a shared/production database.
+The API loads the repo-root `.env` via `env_file` (no `--env-file`) and applies
+its **embedded migrations automatically on boot** (tracked in
+`schema_migrations`, idempotent, fail-fast) — no `make`/`psql` step. The
+migration SQL still lives in `db/migrations/*.up.sql` as the source of truth.
 
 ## Configuration (.env)
 See `.env.example` for the full list. Key groups:
