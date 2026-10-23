@@ -176,6 +176,8 @@ export interface PlanQuote {
   hotel_stars: number;
   nights: number;
   nights_by_city?: number[];
+  travelers?: number;
+  per_person?: number;
   activities_per_night: number;
   estimated: boolean;
   alt_variant?: string;

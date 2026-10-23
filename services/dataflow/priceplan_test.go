@@ -109,6 +109,29 @@ func TestPlan_PerLegModeOverride(t *testing.T) {
 	}
 }
 
+func TestPlan_PassengerScaling(t *testing.T) {
+	p := newTestPlanner()
+	mk := func(adults int) PlanResult {
+		res, err := p.Plan(context.Background(), "t1", PlanRequest{
+			Cities: []string{"Baku", "Tbilisi"}, Start: "Baku", Mode: "flight",
+			Tier: "standard", Nights: 1, Currency: "EUR",
+			Order: []string{"Baku", "Tbilisi"}, Adults: adults,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	one := mk(1)
+	two := mk(2)
+	if !(two.Transport > one.Transport*1.9) {
+		t.Fatalf("2 adults should ~double transport: one=%v two=%v", one.Transport, two.Transport)
+	}
+	if two.Travelers != 2 || two.PerPerson <= 0 {
+		t.Fatalf("per-person fields wrong: travelers=%d per=%v", two.Travelers, two.PerPerson)
+	}
+}
+
 func TestPlan_CurrencyConversion(t *testing.T) {
 	p := newTestPlanner()
 	req := PlanRequest{Cities: []string{"Baku", "Tbilisi"}, Start: "Baku", Mode: "flight", Tier: "standard", Nights: 1}

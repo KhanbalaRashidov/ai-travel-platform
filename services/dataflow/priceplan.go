@@ -105,8 +105,10 @@ type PlanResult struct {
 	Total              float64    `json:"total"`
 	Currency           string     `json:"currency"`
 	HotelStars         int        `json:"hotel_stars"`
-	Nights             int        `json:"nights"`               // total nights
-	NightsByCity       []int      `json:"nights_by_city"`       // aligned to Order
+	Nights             int        `json:"nights"`         // total nights
+	NightsByCity       []int      `json:"nights_by_city"` // aligned to Order
+	Travelers          int        `json:"travelers"`
+	PerPerson          float64    `json:"per_person"`           // total / travelers
 	ActivitiesPerNight float64    `json:"activities_per_night"` // display currency
 	Estimated          bool       `json:"estimated"`
 	AltVariant         string     `json:"alt_variant,omitempty"`
@@ -140,6 +142,27 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 
 // WithFares attaches a real multi-source fare resolver (preferred over estimate).
 func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// payablePax converts the party into payable-fare units: adults full, children
+// discounted (~75%), infants nearly free (~10%). At least 1.
+func payablePax(req PlanRequest) float64 {
+	a := req.Adults
+	if a < 1 {
+		a = 1
+	}
+	p := float64(a) + 0.75*float64(max0(req.Children)) + 0.10*float64(max0(req.Infants))
+	if p < 1 {
+		p = 1
+	}
+	return p
+}
+
+func max0(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
+}
 
 // isValidLegMode reports whether m is an accepted per-leg override.
 func isValidLegMode(m string) bool {
@@ -229,6 +252,13 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	}
 	// Per-call context for the real fare resolver (date + party size).
 	p.tripDate, p.tripAdults = req.StartDate, req.Adults
+	// Payable-passenger multiplier (children discounted, infants ~free) scales
+	// transport + activities; travelers drives the per-person figure.
+	payable := payablePax(req)
+	travelers := req.Adults + req.Children + req.Infants
+	if travelers < 1 {
+		travelers = 1
+	}
 
 	// Keep only cities we can geolocate.
 	known := make([]string, 0, len(req.Cities))
@@ -301,7 +331,9 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if !ok {
 			return PlanResult{}, ErrLegUnavailable
 		}
-		disp, err := p.conv.Convert(q.Price.Amount, q.Price.Currency, cur)
+		// Transport scales with the number of payable passengers.
+		groupEUR := q.Price.Amount * payable
+		disp, err := p.conv.Convert(groupEUR, q.Price.Currency, cur)
 		if err != nil {
 			return PlanResult{}, err
 		}
@@ -312,7 +344,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 			From: order[i], To: order[i+1], Mode: string(q.Mode),
 			Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
 		})
-		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: q.Price})
+		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 	}
 
 	// Nights are driven by the dates (single source of truth): totalNights =
@@ -336,7 +368,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		}
 		hotels = append(hotels, planner.PricedHotel{City: i, Stars: h.Stars, Nights: nightsByCity[i], Nightly: h.Nightly})
 	}
-	activitiesEUR := activitiesPerNightEUR * float64(totalNights)
+	activitiesEUR := activitiesPerNightEUR * float64(totalNights) * payable
 	anyEstimated = true // activities are always an estimate
 
 	bd, err := planner.Price(planner.PlanInput{
@@ -355,6 +387,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		Order: order, Variant: variant, Legs: legs,
 		Transport: bd.Transport, Hotels: bd.Hotels, Activities: bd.Activities, Total: bd.Total,
 		Currency: cur, HotelStars: stars, Nights: totalNights, NightsByCity: nightsByCity,
+		Travelers: travelers, PerPerson: round2(bd.Total / float64(travelers)),
 		ActivitiesPerNight: round2(actPerNightDisp), Estimated: anyEstimated,
 	}
 	if altVariant != "" {

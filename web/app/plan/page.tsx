@@ -268,6 +268,22 @@ export default function PlanPage() {
     setCurrency(v);
     reprice({ currency: v });
   }
+  // Passenger changes re-price the same order live (per-person + totals update).
+  function changeAdults(v: number) {
+    const n = Math.max(1, v);
+    setAdults(n);
+    reprice({ adults: n });
+  }
+  function changeChildren(v: number) {
+    const n = Math.max(0, v);
+    setChildren(n);
+    reprice({ children: n });
+  }
+  function changeInfants(v: number) {
+    const n = Math.max(0, v);
+    setInfants(n);
+    reprice({ infants: n });
+  }
 
   // Apply an AI-parsed edit: match names to the currently selected places
   // (chat can remove/keep; adding a brand-new city is done via autocomplete).
@@ -464,9 +480,9 @@ export default function PlanPage() {
               {t("plan.passengers")}
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <Stepper label={t("plan.adults")} value={adults} min={1} onChange={setAdults} />
-              <Stepper label={t("plan.children")} value={children} min={0} onChange={setChildren} />
-              <Stepper label={t("plan.infants")} value={infants} min={0} onChange={setInfants} />
+              <Stepper label={t("plan.adults")} value={adults} min={1} onChange={changeAdults} />
+              <Stepper label={t("plan.children")} value={children} min={0} onChange={changeChildren} />
+              <Stepper label={t("plan.infants")} value={infants} min={0} onChange={changeInfants} />
             </div>
           </div>
 
@@ -548,6 +564,14 @@ export default function PlanPage() {
                 <div className="mt-5">
                   <CostDonut segments={segments} total={plan.total} currency={plan.currency} fmt={fmt} />
                 </div>
+                {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
+                    <span className="text-muted">{t("res.perPerson")}</span>
+                    <span className="font-semibold tabular-nums">
+                      {fmt(plan.per_person)} {plan.currency}
+                    </span>
+                  </div>
+                )}
                 <p className="mt-4 text-xs leading-relaxed text-muted">{t("res.disclaimer")}</p>
               </Card>
             </div>
