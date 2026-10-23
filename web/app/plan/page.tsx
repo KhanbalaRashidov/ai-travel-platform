@@ -18,6 +18,7 @@ import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
 import { CostDonut, CostSegment } from "../../components/CostDonut";
 import { RouteMap, MapPoint } from "../../components/RouteMap";
 import { AIPanel } from "../../components/AIPanel";
+import { useToast } from "../../components/toast";
 import { PinIcon, RouteIcon, WalletIcon } from "../../components/icons";
 import Link from "next/link";
 
@@ -75,6 +76,7 @@ function Stepper({
 
 export default function PlanPage() {
   const { t, locale } = useI18n();
+  const { toast } = useToast();
 
   // No hardcoded cities: the user searches and adds places (with coordinates).
   const [places, setPlaces] = useState<Place[]>([]);
@@ -182,8 +184,10 @@ export default function PlanPage() {
       });
       setPlan(q);
       track("plan_computed");
+      toast(p.order ? t("toast.updated") : t("toast.ready"), "success");
     } catch {
       setError(t("err.sequence"));
+      toast(t("err.sequence"), "error");
     } finally {
       setLoading(false);
     }

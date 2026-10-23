@@ -3,6 +3,7 @@ import { Inter, Sora } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "../lib/i18n";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { ToastProvider } from "../components/toast";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext", "cyrillic"],
@@ -48,7 +49,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <LocaleProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <ErrorBoundary>
+            <ToastProvider>{children}</ToastProvider>
+          </ErrorBoundary>
         </LocaleProvider>
       </body>
     </html>

@@ -5,9 +5,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -31,7 +33,13 @@ import (
 // aiPrimary/aiBulk are nil when the Anthropic key is not configured.
 func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM, priceSources, corsOrigins string, rateMax int) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "ai-travel-gateway"})
-	app.Use(recover.New(), logger.New(), cors.New(cors.Config{AllowOrigins: corsOrigins}))
+	app.Use(
+		recover.New(),
+		requestid.New(), // X-Request-Id on every request/response (traceability)
+		helmet.New(),    // security headers (X-Content-Type-Options, X-Frame-Options, ...)
+		logger.New(logger.Config{Format: "[${time}] ${locals:requestid} ${status} ${method} ${path} ${latency}\n"}),
+		cors.New(cors.Config{AllowOrigins: corsOrigins}),
+	)
 	app.Use(tenant.Middleware(defaultTenantID))
 
 	// Rate limiter for the expensive AI + scrape endpoints (per-IP, per-minute).
