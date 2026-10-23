@@ -124,6 +124,20 @@ export function destinations(): Promise<DestinationDTO[]> {
   return getJSON("/data/destinations");
 }
 
+// Place autocomplete (GET /data/places) — real city/airport search with coords.
+export interface Place {
+  code: string;
+  name: string;
+  country: string;
+  lat: number;
+  lng: number;
+  kind: string; // "city" | "airport"
+}
+
+export function searchPlaces(q: string): Promise<Place[]> {
+  return getJSON(`/data/places?q=${encodeURIComponent(q)}`);
+}
+
 // --- priced plan (single source of truth: flywheel + estimator + engine) ----
 
 export interface PlanLeg {
@@ -155,6 +169,7 @@ export interface PlanQuote {
 
 export interface PlanQuoteReq {
   cities: string[];
+  places?: { name: string; lat: number; lng: number }[];
   start: string;
   mode: string;
   tier: string;
@@ -162,6 +177,11 @@ export interface PlanQuoteReq {
   currency: string;
   order?: string[]; // supplied => re-price that order without re-sequencing
   variant?: string;
+  start_date?: string;
+  return_date?: string;
+  adults?: number;
+  children?: number;
+  infants?: number;
 }
 
 export function planQuote(req: PlanQuoteReq): Promise<PlanQuote> {

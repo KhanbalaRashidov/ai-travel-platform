@@ -13,6 +13,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/places"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/poi"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/handler"
@@ -55,8 +56,8 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	conv := planner.StaticConverter{Rates: map[string]float64{
 		"EUR": 1, "USD": 0.92, "AZN": 0.53, "TRY": 0.028, "RUB": 0.010, "GBP": 1.17,
 	}}
-	pricePlanner := dataflow.NewPricePlanner(routeFW, estimator, geo, conv)
-	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, pricePlanner)
+	placesClient := places.New(nil)
+	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.
 	aiH := handler.NewAIHandler(aiPrimary, aiBulk,
@@ -84,6 +85,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Get("/data/transport", dataH.Transport)
 	v1.Get("/data/destinations", dataH.Destinations)
 	v1.Get("/data/poi", dataH.POIs)
+	v1.Get("/data/places", dataH.Places)
 	v1.Post("/data/plan", dataH.Plan)
 
 	// AI (Claude): itinerary writer + chat + conversational refine loop.

@@ -37,6 +37,24 @@ func NewStaticGeocoder(m map[string]LatLng) StaticGeocoder {
 	return g
 }
 
+// MergedGeocoder tries each geocoder in order and returns the first hit, so a
+// per-request geocoder (e.g. coordinates the client supplied from autocomplete)
+// can take precedence over a static seed.
+type MergedGeocoder []Geocoder
+
+// Coords returns the first geocoder's hit.
+func (m MergedGeocoder) Coords(city string) (LatLng, bool) {
+	for _, g := range m {
+		if g == nil {
+			continue
+		}
+		if ll, ok := g.Coords(city); ok {
+			return ll, true
+		}
+	}
+	return LatLng{}, false
+}
+
 // HaversineKm returns the great-circle distance between two points in km.
 func HaversineKm(a, b LatLng) float64 {
 	const r = 6371.0

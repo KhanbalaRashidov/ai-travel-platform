@@ -15,6 +15,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/places"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
@@ -38,19 +39,41 @@ func dataApp(t *testing.T) *fiber.App {
 	}
 	geo := knowledge.SeedGeocoder()
 	est := estimate.New(geo, 0)
-	fw := dataflow.NewRouteFlywheel(cache.NewMemKV(), store, est, 0)
+	kv := cache.NewMemKV()
+	fw := dataflow.NewRouteFlywheel(kv, store, est, 0)
 	poi := fakePOI{pois: []conn.POI{{City: "Baku", Name: "Old City", Category: "attraction"}}}
 	conv := planner.StaticConverter{Rates: map[string]float64{"EUR": 1, "USD": 0.92, "AZN": 0.53}}
-	pp := dataflow.NewPricePlanner(fw, est, geo, conv)
-	h := NewDataHandler(fw, poi, store, pp)
+	placesDoer := placesDoerFunc(func(*http.Request) (*http.Response, error) {
+		body := `[{"code":"PAR","name":"Paris","country_name":"France","type":"city","coordinates":{"lat":48.85,"lon":2.35}}]`
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})
+	h := NewDataHandler(fw, poi, store, kv, conv, geo, places.New(placesDoer))
 
 	app := fiber.New()
 	app.Use(tenant.Middleware("t1"))
 	app.Get("/data/transport", h.Transport)
 	app.Get("/data/destinations", h.Destinations)
 	app.Get("/data/poi", h.POIs)
+	app.Get("/data/places", h.Places)
 	app.Post("/data/plan", h.Plan)
 	return app
+}
+
+type placesDoerFunc func(*http.Request) (*http.Response, error)
+
+func (f placesDoerFunc) Do(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestPlacesEndpoint_Autocomplete(t *testing.T) {
+	app := dataApp(t)
+	out := getJSON(t, app, "/data/places?q=par")
+	list, ok := out["data"].([]any)
+	if !ok || len(list) != 1 {
+		t.Fatalf("expected 1 place, got %v", out["data"])
+	}
+	first, _ := list[0].(map[string]any)
+	if first["name"] != "Paris" || first["code"] != "PAR" {
+		t.Fatalf("unexpected place: %v", first)
+	}
 }
 
 func TestPlanEndpoint_PricesFromFlywheel(t *testing.T) {

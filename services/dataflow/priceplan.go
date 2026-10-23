@@ -45,18 +45,47 @@ type LegQuote struct {
 	SourceTier string  `json:"source_tier"`
 }
 
+// PlaceCoord is a city the client selected via autocomplete, with coordinates,
+// so the planner can price any destination (not just a seeded list).
+type PlaceCoord struct {
+	Name string  `json:"name"`
+	Lat  float64 `json:"lat"`
+	Lng  float64 `json:"lng"`
+}
+
 // PlanRequest is a full priced-plan request. When Order is supplied and matches
 // the city set, the TSP step is skipped and that order is only re-priced
-// (preserving the "tier/mode toggle never re-sequences" behavior).
+// (preserving the "tier/mode toggle never re-sequences" behavior). Places (with
+// coordinates) + dates + passengers come from the search form; dates/passengers
+// are pass-through for the real-fare connector.
 type PlanRequest struct {
-	Cities   []string `json:"cities"`
-	Start    string   `json:"start"`
-	Mode     string   `json:"mode"`
-	Tier     string   `json:"tier"`
-	Nights   int      `json:"nights"`
-	Currency string   `json:"currency"`
-	Order    []string `json:"order"`
-	Variant  string   `json:"variant"`
+	Cities   []string     `json:"cities"`
+	Places   []PlaceCoord `json:"places"`
+	Start    string       `json:"start"`
+	Mode     string       `json:"mode"`
+	Tier     string       `json:"tier"`
+	Nights   int          `json:"nights"`
+	Currency string       `json:"currency"`
+	Order    []string     `json:"order"`
+	Variant  string       `json:"variant"`
+
+	StartDate  string `json:"start_date"`
+	ReturnDate string `json:"return_date"`
+	Adults     int    `json:"adults"`
+	Children   int    `json:"children"`
+	Infants    int    `json:"infants"`
+}
+
+// Geocoder builds a case-insensitive geocoder from the request's places, so the
+// planner can resolve any selected city's coordinates.
+func (r PlanRequest) Geocoder() conn.Geocoder {
+	m := make(map[string]conn.LatLng, len(r.Places))
+	for _, p := range r.Places {
+		if p.Name != "" {
+			m[p.Name] = conn.LatLng{Lat: p.Lat, Lng: p.Lng}
+		}
+	}
+	return conn.NewStaticGeocoder(m)
 }
 
 // PlanResult is the fully priced plan, all amounts in the display currency.

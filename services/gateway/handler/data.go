@@ -1,30 +1,42 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/cache"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/httpx"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/places"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
 )
 
-// DataHandler serves flywheel-backed quotes and knowledge-backed destinations.
+// DataHandler serves flywheel-backed quotes, dynamic destinations/places, POIs
+// and the fully priced plan. It holds the pricing building blocks so it can
+// build a request-scoped planner whose geocoder knows the exact cities the user
+// picked via autocomplete (coordinates supplied in the request).
 type DataHandler struct {
 	routes  *dataflow.RouteFlywheel
 	poi     conn.POISource
 	store   knowledge.Store
-	pricing *dataflow.PricePlanner
+	kv      cache.KV
+	conv    planner.Converter
+	seedGeo conn.Geocoder
+	places  *places.Client
 }
 
 // NewDataHandler wires the data handler.
-func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store, pricing *dataflow.PricePlanner) *DataHandler {
-	return &DataHandler{routes: routes, poi: poi, store: store, pricing: pricing}
+func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store, kv cache.KV, conv planner.Converter, seedGeo conn.Geocoder, pl *places.Client) *DataHandler {
+	return &DataHandler{routes: routes, poi: poi, store: store, kv: kv, conv: conv, seedGeo: seedGeo, places: pl}
 }
 
 // Plan handles POST /data/plan — a fully priced plan computed server-side: the
@@ -32,12 +44,20 @@ func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store kn
 // (estimator) and FX, all in one response with provenance/estimated flags. This
 // is the single source of truth for manual planning, tier/mode re-price and the
 // chat refine loop. Supplying `order` re-prices that order without re-sequencing.
+// The request's places (with coordinates) make any selected city priceable.
 func (h *DataHandler) Plan(c *fiber.Ctx) error {
 	var req dataflow.PlanRequest
 	if err := c.BodyParser(&req); err != nil || len(req.Cities) < 2 {
 		return httpx.Err(c, fiber.StatusBadRequest, "at least 2 cities are required")
 	}
-	res, err := h.pricing.Plan(c.Context(), tenant.FromContext(c), req)
+	// Request-scoped geocoder (client coords first, then the seed) + estimator +
+	// flywheel, sharing the durable store/cache so results still cache.
+	geo := conn.MergedGeocoder{req.Geocoder(), h.seedGeo}
+	est := estimate.New(geo, 0)
+	fw := dataflow.NewRouteFlywheel(h.kv, h.store, est, 0)
+	pricing := dataflow.NewPricePlanner(fw, est, geo, h.conv)
+
+	res, err := pricing.Plan(c.Context(), tenant.FromContext(c), req)
 	if err != nil {
 		if errors.Is(err, dataflow.ErrPlanTooFewCities) {
 			return httpx.Err(c, fiber.StatusBadRequest, "at least 2 known cities are required")
@@ -115,4 +135,30 @@ func (h *DataHandler) POIs(c *fiber.Ctx) error {
 		return httpx.Err(c, fiber.StatusInternalServerError, "could not load points of interest")
 	}
 	return httpx.OK(c, pois)
+}
+
+// Places handles GET /data/places?q= — city/airport autocomplete from the
+// Travelpayouts places endpoint, cached in the hot layer (short TTL). Returns
+// geolocated results so the client can plan any selected city.
+func (h *DataHandler) Places(c *fiber.Ctx) error {
+	q := strings.TrimSpace(c.Query("q"))
+	if len(q) < 2 {
+		return httpx.OK(c, []places.Place{})
+	}
+	key := "places|" + strings.ToLower(q)
+	if cached, err := h.kv.Get(c.Context(), key); err == nil && cached != "" {
+		c.Set("Content-Type", "application/json")
+		return c.SendString(`{"success":true,"data":` + cached + `}`)
+	}
+	res, err := h.places.Search(c.Context(), q, 8)
+	if err != nil {
+		if errors.Is(err, conn.ErrUnavailable) {
+			return httpx.Err(c, fiber.StatusBadGateway, "autocomplete is unavailable")
+		}
+		return httpx.Err(c, fiber.StatusInternalServerError, "autocomplete failed")
+	}
+	if b, err := json.Marshal(res); err == nil {
+		_ = h.kv.Set(c.Context(), key, string(b), 6*time.Hour)
+	}
+	return httpx.OK(c, res)
 }
