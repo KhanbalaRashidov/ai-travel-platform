@@ -109,6 +109,31 @@ func TestPlan_PerLegModeOverride(t *testing.T) {
 	}
 }
 
+func TestPlan_OriginNoHotel(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Origin: "Baku", Cities: []string{"Tbilisi", "Istanbul"},
+		Mode: "cheapest", Tier: "standard", Nights: 2, Currency: "EUR",
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if len(res.Order) == 0 || res.Order[0] != "Baku" {
+		t.Fatalf("origin must start the route, got %v", res.Order)
+	}
+	if len(res.HotelLines) != 2 {
+		t.Fatalf("origin takes no hotel -> 2 hotels for 2 destinations, got %d", len(res.HotelLines))
+	}
+	if res.NightsByCity[0] != 0 {
+		t.Fatalf("origin must have 0 nights, got %d", res.NightsByCity[0])
+	}
+	for _, h := range res.HotelLines {
+		if h.City == "Baku" {
+			t.Fatal("origin must not appear in hotels")
+		}
+	}
+}
+
 func TestPlan_RoundTripReturnLeg(t *testing.T) {
 	p := newTestPlanner()
 	res, err := p.Plan(context.Background(), "t1", PlanRequest{

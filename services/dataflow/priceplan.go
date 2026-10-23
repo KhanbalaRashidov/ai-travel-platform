@@ -74,15 +74,17 @@ type PlaceCoord struct {
 // coordinates) + dates + passengers come from the search form; dates/passengers
 // are pass-through for the real-fare connector.
 type PlanRequest struct {
-	Cities   []string     `json:"cities"`
-	Places   []PlaceCoord `json:"places"`
-	Start    string       `json:"start"`
-	Mode     string       `json:"mode"`
-	Tier     string       `json:"tier"`
-	Nights   int          `json:"nights"`
-	Currency string       `json:"currency"`
-	Order    []string     `json:"order"`
-	Variant  string       `json:"variant"`
+	Cities    []string     `json:"cities"`
+	Places    []PlaceCoord `json:"places"`
+	Origin    string       `json:"origin"`     // departure city; start, no hotel/nights
+	BudgetEUR float64      `json:"budget_eur"` // for minimal mode / budget fit
+	Start     string       `json:"start"`
+	Mode      string       `json:"mode"`
+	Tier      string       `json:"tier"`
+	Nights    int          `json:"nights"`
+	Currency  string       `json:"currency"`
+	Order     []string     `json:"order"`
+	Variant   string       `json:"variant"`
 	// LegModes overrides the transport mode for specific legs, keyed by
 	// "from|to" (used by the per-leg alternatives selector). Pricing-only — it
 	// never changes the sequence.
@@ -282,9 +284,22 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		travelers = 1
 	}
 
-	// Keep only cities we can geolocate.
-	known := make([]string, 0, len(req.Cities))
+	// Build the node list. When an origin is given it becomes the start and gets
+	// NO hotel/nights (it's the departure point); destinations get hotels. The
+	// origin is excluded from the destination set even if also listed there.
+	origin := strings.TrimSpace(req.Origin)
+	if _, ok := p.geo.Coords(origin); origin != "" && !ok {
+		origin = "" // origin not geolocatable -> ignore it
+	}
+
+	known := make([]string, 0, len(req.Cities)+1)
+	if origin != "" {
+		known = append(known, origin)
+	}
 	for _, c := range req.Cities {
+		if origin != "" && eqFold(c, origin) {
+			continue
+		}
 		if _, ok := p.geo.Coords(c); ok {
 			known = append(known, c)
 		}
@@ -293,9 +308,15 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		return PlanResult{}, ErrPlanTooFewCities
 	}
 
-	startIdx := indexOfFold(known, req.Start)
-	if startIdx < 0 {
-		startIdx = 0
+	// isHotelNode reports whether a node name takes a hotel (origin does not).
+	isHotelNode := func(name string) bool { return origin == "" || !eqFold(name, origin) }
+
+	startIdx := 0
+	if origin == "" {
+		startIdx = indexOfFold(known, req.Start)
+		if startIdx < 0 {
+			startIdx = 0
+		}
 	}
 
 	var order []string
@@ -394,19 +415,29 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		}
 	}
 
-	// Nights are driven by the dates (single source of truth): totalNights =
-	// return - depart, split across the cities via AllocateNights. Without dates
-	// we fall back to req.Nights per city.
-	nightsByCity, totalNights := allocateNights(order, req, nights)
+	// Nights are driven by the dates (totalNights = return - depart) and split
+	// across the DESTINATIONS only (the origin never takes a hotel/nights).
+	var hotelIdx []int
+	for i, name := range order {
+		if isHotelNode(name) {
+			hotelIdx = append(hotelIdx, i)
+		}
+	}
+	destNights, totalNights := allocateNightsN(len(hotelIdx), req, nights)
+	nightsByCity := make([]int, len(order)) // origin stays 0
+	for k, oi := range hotelIdx {
+		nightsByCity[oi] = destNights[k]
+	}
 
-	// Hotels + activities via the estimator, using per-city nights.
+	// Hotels + activities via the estimator (destinations only).
 	stars := tierStars[req.Tier]
 	if stars == 0 {
 		stars = 4
 	}
-	hotels := make([]planner.PricedHotel, 0, len(order))
-	hotelLines := make([]HotelLine, 0, len(order))
-	for i, city := range order {
+	hotels := make([]planner.PricedHotel, 0, len(hotelIdx))
+	hotelLines := make([]HotelLine, 0, len(hotelIdx))
+	for _, oi := range hotelIdx {
+		city := order[oi]
 		h, err := p.hotels.Hotel(ctx, city, stars)
 		if err != nil {
 			return PlanResult{}, err
@@ -414,11 +445,11 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if h.Estimated {
 			anyEstimated = true
 		}
-		hotels = append(hotels, planner.PricedHotel{City: i, Stars: h.Stars, Nights: nightsByCity[i], Nightly: h.Nightly})
+		hotels = append(hotels, planner.PricedHotel{City: oi, Stars: h.Stars, Nights: nightsByCity[oi], Nightly: h.Nightly})
 		nightlyDisp, _ := p.conv.Convert(h.Nightly.Amount, h.Nightly.Currency, cur)
 		hotelLines = append(hotelLines, HotelLine{
-			City: city, Stars: h.Stars, Nights: nightsByCity[i],
-			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[i])),
+			City: city, Stars: h.Stars, Nights: nightsByCity[oi],
+			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[oi])),
 			Estimated: h.Estimated, Source: h.Source, FetchedAt: fetchedAtStr(h.FetchedAt),
 		})
 	}
@@ -452,10 +483,13 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	return res, nil
 }
 
-// allocateNights derives per-city nights from the trip dates (AllocateNights
-// over total = return - depart); without valid dates it uses fallbackPer each.
-func allocateNights(order []string, req PlanRequest, fallbackPer int) ([]int, int) {
-	n := len(order)
+// allocateNightsN derives per-destination nights for n destinations from the
+// trip dates (AllocateNights over total = return - depart); without valid dates
+// it uses fallbackPer each.
+func allocateNightsN(n int, req PlanRequest, fallbackPer int) ([]int, int) {
+	if n <= 0 {
+		return nil, 0
+	}
 	if d := nightsBetween(req.StartDate, req.ReturnDate); d > 0 {
 		return planner.AllocateNights(d, n, 1, nil), d
 	}
@@ -481,6 +515,8 @@ func nightsBetween(start, end string) int {
 	}
 	return d
 }
+
+func eqFold(a, b string) bool { return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b)) }
 
 func indexOfFold(list []string, v string) int {
 	for i, x := range list {

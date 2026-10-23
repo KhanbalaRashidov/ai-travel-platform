@@ -45,7 +45,7 @@ export function RouteTimeline({
               {i + 1}
             </span>
             <span className="font-display text-base font-semibold">{stop}</span>
-            {typeof nights[i] === "number" && (
+            {typeof nights[i] === "number" && nights[i] > 0 && (
               <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
                 {nightLabel ? nightLabel(nights[i]) : `${nights[i]}n`}
               </span>

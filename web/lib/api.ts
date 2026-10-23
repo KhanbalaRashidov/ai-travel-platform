@@ -200,6 +200,8 @@ export interface PlanQuote {
 export interface PlanQuoteReq {
   cities: string[];
   places?: { name: string; lat: number; lng: number }[];
+  origin?: string;
+  budget_eur?: number;
   start: string;
   mode: string;
   tier: string;

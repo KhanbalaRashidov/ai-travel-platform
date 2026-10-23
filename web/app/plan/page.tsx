@@ -25,6 +25,7 @@ import Link from "next/link";
 
 interface Pending {
   places: Place[];
+  origin: Place | null;
   start: string;
   mode: ModePref;
   tier: Tier;
@@ -81,6 +82,7 @@ export default function PlanPage() {
 
   // No hardcoded cities: the user searches and adds places (with coordinates).
   const [places, setPlaces] = useState<Place[]>([]);
+  const [origin, setOrigin] = useState<Place | null>(null); // departure (no hotel)
   const [start, setStart] = useState("");
   const [startDate, setStartDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
@@ -127,7 +129,7 @@ export default function PlanPage() {
       if (typeof d.inf === "number") setInfants(d.inf);
       if (pl.length >= 2) {
         setPending({
-          places: pl, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
+          places: pl, origin: null, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
           nights: 2, currency: d.cu ?? "EUR", order: undefined, legModes: {},
           startDate: d.d ?? "", returnDate: d.r ?? "",
           adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0,
@@ -157,18 +159,24 @@ export default function PlanPage() {
   }
 
   async function fetchPlan(p: Pending) {
-    if (p.places.length < 2) {
+    if (p.places.length < (p.origin ? 1 : 2)) {
       setError(t("err.minCities"));
       return;
     }
     const names = p.places.map((x) => x.name);
     const startName = names.includes(p.start) ? p.start : names[0];
+    // Origin (if any) ships its coords in `places` so the backend can geolocate it.
+    const coords = [
+      ...(p.origin ? [{ name: p.origin.name, lat: p.origin.lat, lng: p.origin.lng }] : []),
+      ...p.places.map((x) => ({ name: x.name, lat: x.lat, lng: x.lng })),
+    ];
     setLoading(true);
     setError(null);
     try {
       const q = await planQuote({
         cities: names,
-        places: p.places.map((x) => ({ name: x.name, lat: x.lat, lng: x.lng })),
+        places: coords,
+        origin: p.origin?.name,
         start: startName,
         mode: p.mode,
         tier: p.tier,
@@ -221,6 +229,7 @@ export default function PlanPage() {
   function base(order?: string[]): Pending {
     return {
       places,
+      origin,
       start,
       mode: pref,
       tier,
@@ -245,7 +254,7 @@ export default function PlanPage() {
   }
 
   function onPlan() {
-    if (places.length < 2) {
+    if (places.length < (origin ? 1 : 2)) {
       setError(t("err.minCities"));
       return;
     }
@@ -306,6 +315,7 @@ export default function PlanPage() {
       if (resequence) setLegModes({});
       setPending({
         places: newPlaces,
+        origin,
         start: newStart,
         mode: newPref,
         tier: newTier,
@@ -403,6 +413,39 @@ export default function PlanPage() {
 
         {/* Search wizard */}
         <Card className="mt-6 animate-fade-up print:hidden">
+          <Field label={t("plan.origin")}>
+            {origin ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
+                  <PinIcon width={13} height={13} />
+                  {origin.name}
+                  <span className="text-accent/70">· {t("plan.originNote")}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrigin(null);
+                      setPlan(null);
+                    }}
+                    aria-label="remove origin"
+                    className="ml-0.5 hover:text-accent"
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <CityAutocomplete
+                onAdd={(p) => {
+                  setOrigin(p);
+                  setPlan(null);
+                }}
+                placeholder={t("plan.origin")}
+                isSelected={() => false}
+              />
+            )}
+          </Field>
+
+          <div className="mt-4" />
           <Field label={t("plan.cities")}>
             <CityAutocomplete
               onAdd={addPlace}
@@ -488,7 +531,7 @@ export default function PlanPage() {
           </div>
 
           <div className="mt-6">
-            <Button onClick={onPlan} disabled={loading || places.length < 2}>
+            <Button onClick={onPlan} disabled={loading || places.length < (origin ? 1 : 2)}>
               {loading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-fg/40 border-t-primary-fg" />
