@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -92,7 +93,13 @@ func (h *DataHandler) Plan(c *fiber.Ctx) error {
 		pricing = pricing.WithFares(h.fares).WithFareDeadline(4 * time.Second)
 	}
 
-	res, err := pricing.Plan(c.Context(), tenant.FromContext(c), req)
+	// Hard overall deadline so a plan NEVER blocks on slow real-price fetches:
+	// when it fires, in-flight source/LLM calls are cancelled and every leg that
+	// hasn't resolved falls back to the labeled estimate — the plan still returns.
+	ctx, cancel := context.WithTimeout(c.Context(), planDeadline)
+	defer cancel()
+
+	res, err := pricing.Plan(ctx, tenant.FromContext(c), req)
 	if err != nil {
 		if errors.Is(err, dataflow.ErrPlanTooFewCities) {
 			return httpx.Err(c, fiber.StatusBadRequest, "at least 2 known cities are required")
@@ -104,6 +111,10 @@ func (h *DataHandler) Plan(c *fiber.Ctx) error {
 	}
 	return httpx.OK(c, res)
 }
+
+// planDeadline bounds total /data/plan time so the client never waits on slow
+// cold fetches; past it, unresolved legs use the labeled estimate.
+const planDeadline = 9 * time.Second
 
 var validModes = map[string]conn.TransportMode{
 	"flight": conn.ModeFlight,

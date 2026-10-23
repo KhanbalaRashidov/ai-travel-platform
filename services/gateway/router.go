@@ -31,7 +31,7 @@ import (
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
 // aiPrimary/aiBulk are nil when the Anthropic key is not configured.
-func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM, priceSources, corsOrigins string, rateMax int) *fiber.App {
+func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk, aiExtract ai.LLM, priceSources, corsOrigins string, rateMax int) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "ai-travel-gateway"})
 	app.Use(
 		recover.New(),
@@ -81,7 +81,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// the planner falls back to the labeled estimate. The verbatim guardrail
 	// ensures the LLM can only report prices present in the fetched page.
 	priceSrcs := pricefetch.DefaultSources(priceSources, pricefetch.NewHTTPRenderer(nil), pricefetch.NewHeadless())
-	fares := pricefetch.NewResolver(priceSrcs, aiPrimary, conv, kv, 0).
+	fares := pricefetch.NewResolver(priceSrcs, aiExtract, conv, kv, 0).
 		WithWarm(pricefetch.NewPgWarm(pool))
 	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares, aiPrimary)
 

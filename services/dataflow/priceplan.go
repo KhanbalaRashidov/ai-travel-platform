@@ -307,12 +307,25 @@ func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode
 	if q, chain, ok := p.realLeg(ctx, tenantID, from, to, mode); ok {
 		return q, chain, TierCold, true
 	}
+	q, tier, ok := p.estimateLeg(ctx, tenantID, from, to, mode)
+	return q, nil, tier, ok
+}
+
+// estimateLeg resolves a leg using ONLY the local flywheel estimator (no real
+// cold fetch). It is the fast path used to build the TSP cost matrix, so routing
+// never triggers the O(n^2) network/LLM fetches — those run once per final leg.
+func (p *PricePlanner) estimateLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, Tier, bool) {
+	// The local estimate must still compute after the overall plan deadline has
+	// fired, so detach from a cancelled context (the estimator needs no ctx).
+	if ctx.Err() != nil {
+		ctx = context.Background()
+	}
 	if mode != "" && mode != "cheapest" {
 		q, tier, err := p.routes.Route(ctx, tenantID, from, to, conn.TransportMode(mode))
 		if err != nil {
-			return conn.TransportQuote{}, nil, "", false
+			return conn.TransportQuote{}, "", false
 		}
-		return q, nil, tier, true
+		return q, tier, true
 	}
 	var best conn.TransportQuote
 	var bestTier Tier
@@ -326,7 +339,7 @@ func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode
 			best, bestTier, found = q, tier, true
 		}
 	}
-	return best, nil, bestTier, found
+	return best, bestTier, found
 }
 
 // Plan prices a full trip. It resolves the city order (TSP, unless a matching
@@ -406,7 +419,9 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 				if i == j {
 					continue
 				}
-				q, _, _, ok := p.cheapestLeg(ctx, tenantID, known[i], known[j], req.Mode)
+				// Routing uses the fast estimator only; the expensive real fetch
+				// runs once per final leg, not for every O(n^2) matrix pair.
+				q, _, ok := p.estimateLeg(ctx, tenantID, known[i], known[j], req.Mode)
 				if !ok {
 					m[i][j] = math.MaxFloat64
 					continue

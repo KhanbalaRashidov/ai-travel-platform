@@ -135,6 +135,9 @@ const MESSAGES: Record<Locale, Dict> = {
     "err.modeImpossible":
       "\"{mode}\" bu marşrut üçün mümkün deyil ({from} → {to}). Başqa nəqliyyat seçin.",
     "err.sequence": "marşrut hesablanmadı",
+    "err.timeout": "Plan çox uzun çəkdi. Təxmini qiymətlərlə yenidən cəhd edin.",
+    "err.plan": "Plan hesablanmadı. Zəhmət olmasa yenidən cəhd edin.",
+    "plan.retry": "Yenidən cəhd et",
     "err.price": "qiymətləndirmə alınmadı",
   },
   en: {
@@ -248,6 +251,9 @@ const MESSAGES: Record<Locale, Dict> = {
     "err.modeImpossible":
       "\"{mode}\" is not possible for this route ({from} → {to}). Choose another transport.",
     "err.sequence": "could not compute the route",
+    "err.timeout": "The plan took too long. Please retry — estimates will be used.",
+    "err.plan": "Could not compute the plan. Please try again.",
+    "plan.retry": "Retry",
     "err.price": "pricing failed",
   },
   ru: {
@@ -361,6 +367,9 @@ const MESSAGES: Record<Locale, Dict> = {
     "err.modeImpossible":
       "«{mode}» невозможен для этого маршрута ({from} → {to}). Выберите другой транспорт.",
     "err.sequence": "не удалось рассчитать маршрут",
+    "err.timeout": "План считался слишком долго. Повторите — будут использованы оценки.",
+    "err.plan": "Не удалось рассчитать план. Повторите попытку.",
+    "plan.retry": "Повторить",
     "err.price": "ошибка расчёта цены",
   },
   tr: {
@@ -474,6 +483,9 @@ const MESSAGES: Record<Locale, Dict> = {
     "err.modeImpossible":
       "\"{mode}\" bu rota için mümkün değil ({from} → {to}). Başka ulaşım seçin.",
     "err.sequence": "rota hesaplanamadı",
+    "err.timeout": "Plan çok uzun sürdü. Tahmini fiyatlarla tekrar deneyin.",
+    "err.plan": "Plan hesaplanamadı. Lütfen tekrar deneyin.",
+    "plan.retry": "Tekrar dene",
     "err.price": "fiyatlandırma başarısız",
   },
 };

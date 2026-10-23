@@ -180,9 +180,15 @@ func (r *Resolver) fetchOne(ctx context.Context, s PriceSource, q LegQuery) []Ca
 	if err != nil {
 		return nil // graceful skip (blocked/unavailable)
 	}
-	prices, err := Extract(ctx, r.llm, raw, q)
-	if err != nil {
-		return nil
+	// Fast path: a regex pre-parser handles currency-marked prices without the
+	// LLM. The model is called ONLY when the regex finds nothing — this cuts the
+	// vast majority of extraction calls (and latency).
+	prices := RegexExtract(raw)
+	if len(prices) == 0 {
+		prices, err = Extract(ctx, r.llm, raw, q)
+		if err != nil {
+			return nil
+		}
 	}
 	var out []Candidate
 	for _, p := range prices {

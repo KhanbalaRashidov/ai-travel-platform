@@ -26,6 +26,7 @@ type Config struct {
 	LLMProvider         string
 	GroqAPIKey          string
 	GroqModel           string
+	GroqFastModel       string // fast model for simple extraction (price parsing)
 	GeminiAPIKey        string
 	GeminiModel         string
 	GeminiFallbackModel string
@@ -59,6 +60,7 @@ func Load() Config {
 		LLMProvider:         getenv("LLM_PROVIDER", "groq"),
 		GroqAPIKey:          os.Getenv("GROQ_API_KEY"),
 		GroqModel:           getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+		GroqFastModel:       getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant"),
 		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:         getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 		GeminiFallbackModel: os.Getenv("GEMINI_FALLBACK_MODEL"),

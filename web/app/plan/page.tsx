@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CURRENCIES, ModePref, Tier } from "../../lib/sample";
 import {
+  ApiError,
   EditState,
   ItineraryBrief,
   Place,
@@ -169,12 +170,15 @@ export default function PlanPage() {
   // Monotonic request id: a superseded (stale) plan response is ignored so the
   // latest toggle always wins, with no wasted re-render (§6).
   const planSeq = useRef(0);
+  // Last attempted request, so the error state can offer a one-click retry.
+  const lastTry = useRef<Pending | null>(null);
 
   async function fetchPlan(p: Pending) {
     if (!enoughToPlan(p.places, p.origin, p.budget)) {
       setError(t("err.minCities"));
       return;
     }
+    lastTry.current = p;
     const seq = ++planSeq.current;
     const names = p.places.map((x) => x.name);
     const startName = names.includes(p.start) ? p.start : names[0];
@@ -209,13 +213,19 @@ export default function PlanPage() {
       setPlan(q);
       track("plan_computed");
       toast(p.order ? t("toast.updated") : t("toast.ready"), "success");
-    } catch {
+    } catch (e) {
       if (seq !== planSeq.current) return;
-      setError(t("err.sequence"));
-      toast(t("err.sequence"), "error");
+      const msg = e instanceof ApiError && e.status === 408 ? t("err.timeout") : t("err.plan");
+      setError(msg);
+      toast(msg, "error");
     } finally {
       if (seq === planSeq.current) setLoading(false);
     }
+  }
+
+  // Re-run the last attempted plan (error-state retry button).
+  function retryPlan() {
+    if (lastTry.current) setPending(lastTry.current);
   }
 
   useEffect(() => {
@@ -617,9 +627,12 @@ export default function PlanPage() {
         </Card>
 
         {error && (
-          <p className="mt-4 animate-fade-in rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-            {error}
-          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            <span>{error}</span>
+            <Button variant="ghost" onClick={retryPlan} disabled={loading}>
+              {t("plan.retry")}
+            </Button>
+          </div>
         )}
 
         {/* Empty state */}

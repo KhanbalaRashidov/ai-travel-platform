@@ -53,9 +53,9 @@ func main() {
 		}
 	}
 
-	aiPrimary, aiBulk := buildLLMs(cfg)
+	aiPrimary, aiBulk, aiExtract := buildLLMs(cfg)
 
-	app := buildApp(pool, rdb, jwtMgr, defaultTenantID, aiPrimary, aiBulk, cfg.PriceSources, cfg.CORSOrigins, cfg.RateLimitPerMin)
+	app := buildApp(pool, rdb, jwtMgr, defaultTenantID, aiPrimary, aiBulk, aiExtract, cfg.PriceSources, cfg.CORSOrigins, cfg.RateLimitPerMin)
 
 	log.Printf("gateway listening on :%s (env=%s)", cfg.Port, cfg.AppEnv)
 	if err := app.Listen(":" + cfg.Port); err != nil {
@@ -63,11 +63,12 @@ func main() {
 	}
 }
 
-// buildLLMs constructs the LLM adapters for the selected provider. Both share
-// one budget (fail-closed at the cap) and a meter that logs token/cost per call.
-// When the selected provider's key is empty it returns nil,nil and the AI
-// endpoints report 503. Default provider is Gemini (free).
-func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
+// buildLLMs constructs the LLM adapters for the selected provider: a reasoning
+// model (primary), a bulk model, and a FAST model for simple extraction (price
+// parsing) so those cheap/hot-path calls don't use the big slow model. All share
+// one budget (fail-closed) and a meter. When the selected provider's key is
+// empty it returns nil,nil,nil and the AI endpoints report 503.
+func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM, ai.LLM) {
 	budget := ai.NewBudget(cfg.AIBudgetUSD)
 	meter := func(model string, u ai.Usage) {
 		log.Printf("ai: model=%s in=%d out=%d cost=$%.4f spent=$%.4f/$%.2f",
@@ -78,29 +79,32 @@ func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
 	case "claude":
 		if cfg.AnthropicAPIKey == "" {
 			log.Printf("AI disabled: provider=claude but ANTHROPIC_API_KEY not set (AI endpoints will return 503)")
-			return nil, nil
+			return nil, nil, nil
 		}
 		primary := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelPrimary, nil).WithBudget(budget).WithMeter(meter)
 		bulk := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelBulk, nil).WithBudget(budget).WithMeter(meter)
 		log.Printf("AI enabled: provider=claude primary=%s bulk=%s budget=$%.2f", ai.ModelPrimary.Name, ai.ModelBulk.Name, cfg.AIBudgetUSD)
-		return primary, bulk
+		return primary, bulk, bulk // bulk doubles as the extraction model
 	case "gemini":
 		if cfg.GeminiAPIKey == "" {
 			log.Printf("AI disabled: provider=gemini but GEMINI_API_KEY not set (AI endpoints will return 503)")
-			return nil, nil
+			return nil, nil, nil
 		}
 		llm := ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiModel, nil).
 			WithBudget(budget).WithMeter(meter).WithFallback(cfg.GeminiFallbackModel)
 		log.Printf("AI enabled: provider=gemini model=%s fallback=%q (free)", llm.Model(), cfg.GeminiFallbackModel)
-		return llm, llm
+		return llm, llm, llm
 	default: // groq (free)
 		if cfg.GroqAPIKey == "" {
 			log.Printf("AI disabled: provider=groq but GROQ_API_KEY not set (AI endpoints will return 503)")
-			return nil, nil
+			return nil, nil, nil
 		}
 		llm := ai.NewGroq(cfg.GroqAPIKey, cfg.GroqModel, nil).WithBudget(budget).WithMeter(meter)
-		log.Printf("AI enabled: provider=groq model=%s (free)", llm.Model())
-		return llm, llm // one free model serves both reasoning and bulk
+		// A small, fast model handles price extraction (hot path), so the big
+		// model is reserved for roadmap/chat.
+		fast := ai.NewGroq(cfg.GroqAPIKey, cfg.GroqFastModel, nil).WithBudget(budget).WithMeter(meter)
+		log.Printf("AI enabled: provider=groq model=%s extract=%s (free)", llm.Model(), fast.Model())
+		return llm, llm, fast
 	}
 }
 
