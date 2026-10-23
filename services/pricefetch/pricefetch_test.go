@@ -5,12 +5,41 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 )
+
+// extractLLM is a stateless (concurrency-safe) fake that extracts the first
+// "<num> <CUR>" from the prompt — mirrors a real extractor and is safe under the
+// resolver's parallel fetch.
+type extractLLM struct{}
+
+var priceRe = regexp.MustCompile(`([0-9]+(?:\.[0-9]+)?)\s*(EUR|USD|AZN)`)
+
+func (extractLLM) Complete(_ context.Context, msgs []ai.Message, _ []ai.ToolSpec) (ai.Completion, error) {
+	text := ""
+	for _, m := range msgs {
+		if m.Role == ai.RoleUser {
+			text = m.Content
+		}
+	}
+	mm := priceRe.FindStringSubmatch(text)
+	if mm == nil {
+		return ai.Completion{Content: `{"prices":[]}`}, nil
+	}
+	return ai.Completion{Content: fmt.Sprintf(`{"prices":[{"price":%s,"currency":"%s"}]}`, mm[1], mm[2])}, nil
+}
+
+// fixedLLM returns a constant body (used to simulate a hallucinated price).
+type fixedLLM struct{ body string }
+
+func (f fixedLLM) Complete(context.Context, []ai.Message, []ai.ToolSpec) (ai.Completion, error) {
+	return ai.Completion{Content: f.body}, nil
+}
 
 // --- test doubles -----------------------------------------------------------
 
@@ -82,47 +111,54 @@ func fakeSource(name, body string) PriceSource {
 }
 
 func TestResolver_ExtractGuardCompare(t *testing.T) {
-	// Source A text has 120 EUR; source B text has 100 USD (=~111 EUR) and a
-	// hallucinated 50 the model also returns but which is NOT in the text.
+	// Source A text has 120 EUR; source B text has 100 USD (~90 EUR). Sources are
+	// fetched in parallel, so the extractor must be stateless.
 	srcA := fakeSource("A", "Flight Baku-Tbilisi from 120 EUR one way")
 	srcB := fakeSource("B", "Baku to Tbilisi tickets 100 USD")
 
-	// MockLLM replies once per source (JSON mode path uses Complete via mock).
-	llm := &ai.MockLLM{Script: []ai.Completion{
-		{Content: `{"prices":[{"price":120,"currency":"EUR"}]}`},
-		{Content: `{"prices":[{"price":100,"currency":"USD"},{"price":50,"currency":"USD"}]}`},
-	}}
-
-	r := NewResolver([]PriceSource{srcA, srcB}, llm, conv(), nil, 0)
+	r := NewResolver([]PriceSource{srcA, srcB}, extractLLM{}, conv(), nil, 0)
 	if !r.Enabled() {
 		t.Fatal("resolver with sources + llm should be enabled")
 	}
-	cand, ok := r.Quote(context.Background(), LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}, "EUR")
+	cand, ok := r.Quote(context.Background(), LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}, "EUR", "t1")
 	if !ok {
 		t.Fatal("expected a candidate")
 	}
-	// 100 USD -> 111.1 EUR vs 120 EUR -> cheapest is source B's 100 USD. The
-	// hallucinated 50 (not in text) must have been dropped by the guardrail.
+	// 100 USD -> 90 EUR vs 120 EUR -> cheapest is source B's 100 USD.
 	if cand.Source != "B" || cand.Price.Currency != "USD" || cand.Price.Amount != 100 {
 		t.Fatalf("expected cheapest = B 100 USD, got %+v", cand)
 	}
 }
 
 func TestResolver_DisabledWithoutSources(t *testing.T) {
-	r := NewResolver(nil, &ai.MockLLM{}, conv(), nil, 0)
+	r := NewResolver(nil, extractLLM{}, conv(), nil, 0)
 	if r.Enabled() {
 		t.Fatal("no sources -> disabled")
 	}
-	if _, ok := r.Quote(context.Background(), LegQuery{}, "EUR"); ok {
+	if _, ok := r.Quote(context.Background(), LegQuery{}, "EUR", "t1"); ok {
 		t.Fatal("disabled resolver must not return a candidate")
 	}
 }
 
 func TestResolver_AllHallucinatedDropped(t *testing.T) {
 	src := fakeSource("A", "No prices on this page at all")
-	llm := &ai.MockLLM{Script: []ai.Completion{{Content: `{"prices":[{"price":77,"currency":"EUR"}]}`}}}
-	r := NewResolver([]PriceSource{src}, llm, conv(), nil, 0)
-	if _, ok := r.Quote(context.Background(), LegQuery{From: "A", To: "B"}, "EUR"); ok {
+	// The model returns 77 EUR, which is NOT in the fetched text -> guardrail drops it.
+	r := NewResolver([]PriceSource{src}, fixedLLM{body: `{"prices":[{"price":77,"currency":"EUR"}]}`}, conv(), nil, 0)
+	if _, ok := r.Quote(context.Background(), LegQuery{From: "A", To: "B"}, "EUR", "t1"); ok {
 		t.Fatal("a price absent from the text must be dropped -> no candidate")
+	}
+}
+
+func TestResolver_WarmCacheHit(t *testing.T) {
+	src := fakeSource("A", "Baku to Tbilisi 120 EUR")
+	warm := NewMemWarm()
+	r := NewResolver([]PriceSource{src}, extractLLM{}, conv(), nil, 0).WithWarm(warm)
+	q := LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}
+	if _, ok := r.Quote(context.Background(), q, "EUR", "t1"); !ok {
+		t.Fatal("expected a candidate (cold)")
+	}
+	// Second call should be served from warm even if the source now fails.
+	if _, ok := warm.GetFare(context.Background(), "t1", cacheKey(q, "EUR")); !ok {
+		t.Fatal("cold result must be written to warm")
 	}
 }

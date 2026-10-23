@@ -67,6 +67,8 @@ func (r *HTTPRenderer) Render(ctx context.Context, url string) (string, int, err
 type PriceSource interface {
 	Name() string
 	ToS() string
+	// Modes are the transport modes this source serves; empty means any.
+	Modes() []conn.TransportMode
 	Fetch(ctx context.Context, q LegQuery) (raw string, url string, err error)
 }
 
@@ -80,6 +82,7 @@ type HTTPSource struct {
 	build    func(q LegQuery) string
 	http     Renderer
 	headless Renderer // optional; used when HTTP returns an empty/JS-only page
+	modes    []conn.TransportMode
 }
 
 // NewHTTPSource builds a source. Pass nil http renderer for the default; headless
@@ -91,11 +94,17 @@ func NewHTTPSource(name, tos string, build func(q LegQuery) string, httpR, headl
 	return &HTTPSource{name: name, tos: tos, build: build, http: httpR, headless: headless}
 }
 
+// WithModes restricts the source to the given transport modes (empty = any).
+func (s *HTTPSource) WithModes(m ...conn.TransportMode) *HTTPSource { s.modes = m; return s }
+
 // Name identifies the source.
 func (s *HTTPSource) Name() string { return s.name }
 
 // ToS returns the source's terms note.
 func (s *HTTPSource) ToS() string { return s.tos }
+
+// Modes are the transport modes this source serves (empty = any).
+func (s *HTTPSource) Modes() []conn.TransportMode { return s.modes }
 
 // blocked reports an anti-bot / error status worth skipping (not retry-hammering).
 func blocked(status int) bool {

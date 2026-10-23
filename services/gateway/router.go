@@ -63,8 +63,9 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// (NewHeadless returns nil otherwise). Blocked/empty sources are skipped and
 	// the planner falls back to the labeled estimate. The verbatim guardrail
 	// ensures the LLM can only report prices present in the fetched page.
-	priceSrcs := pricefetch.SourcesFromSpec(priceSources, pricefetch.NewHTTPRenderer(nil), pricefetch.NewHeadless())
-	fares := pricefetch.NewResolver(priceSrcs, aiPrimary, conv, kv, 0)
+	priceSrcs := pricefetch.DefaultSources(priceSources, pricefetch.NewHTTPRenderer(nil), pricefetch.NewHeadless())
+	fares := pricefetch.NewResolver(priceSrcs, aiPrimary, conv, kv, 0).
+		WithWarm(pricefetch.NewPgWarm(pool))
 	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.

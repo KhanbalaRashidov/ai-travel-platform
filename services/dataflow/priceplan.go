@@ -111,7 +111,7 @@ type PlanResult struct {
 // satisfies it). When it returns a quote, it is preferred over the estimator.
 type FareResolver interface {
 	Enabled() bool
-	Quote(ctx context.Context, q pricefetch.LegQuery, display string) (pricefetch.Candidate, bool)
+	Quote(ctx context.Context, q pricefetch.LegQuery, display, tenantID string) (pricefetch.Candidate, bool)
 }
 
 // PricePlanner composes the real fare resolver (preferred), the flywheel
@@ -149,7 +149,7 @@ func resolveMode(mode string) conn.TransportMode {
 
 // realLeg tries the real fare resolver for a leg, returning an EUR-normalized,
 // provenance-tagged quote (Estimated=false) on success.
-func (p *PricePlanner) realLeg(ctx context.Context, from, to, mode string) (conn.TransportQuote, bool) {
+func (p *PricePlanner) realLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, bool) {
 	if p.fares == nil || !p.fares.Enabled() {
 		return conn.TransportQuote{}, false
 	}
@@ -160,7 +160,7 @@ func (p *PricePlanner) realLeg(ctx context.Context, from, to, mode string) (conn
 		FromLat: fc.Lat, FromLng: fc.Lng, ToLat: tc.Lat, ToLng: tc.Lng,
 		Mode: resolveMode(mode), DepartDate: p.tripDate, Adults: p.tripAdults,
 	}
-	cand, ok := p.fares.Quote(ctx, q, "EUR")
+	cand, ok := p.fares.Quote(ctx, q, "EUR", tenantID)
 	if !ok {
 		return conn.TransportQuote{}, false
 	}
@@ -179,7 +179,7 @@ func (p *PricePlanner) realLeg(ctx context.Context, from, to, mode string) (conn
 // price when available, otherwise the flywheel (estimator). "cheapest" picks the
 // min across modes on the estimator path. Returns ok=false when nothing is viable.
 func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, Tier, bool) {
-	if q, ok := p.realLeg(ctx, from, to, mode); ok {
+	if q, ok := p.realLeg(ctx, tenantID, from, to, mode); ok {
 		return q, TierCold, true
 	}
 	if mode != "" && mode != "cheapest" {
