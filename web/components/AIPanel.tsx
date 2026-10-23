@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   AIResult,
   ApiError,
+  chat as chatApi,
   EditState,
   itinerary as itineraryApi,
   ItineraryBrief,
@@ -100,8 +101,16 @@ export function AIPanel({
     setChatErr(null);
     try {
       const r = await refineApi(msg, refineState);
-      setMessages((m) => [...m, { role: "assistant", text: describeChanges(r.changed) }]);
-      onRefine(r.state, r.changed);
+      if (r.changed && r.changed.length > 0) {
+        // It was an edit: apply it + confirm.
+        setMessages((m) => [...m, { role: "assistant", text: describeChanges(r.changed) }]);
+        onRefine(r.state, r.changed);
+      } else {
+        // Not an edit -> answer the question (grounded). Never a dead-end.
+        const a = await chatApi(msg, locale);
+        const text = a.text?.trim() ? a.text : describeChanges([]);
+        setMessages((m) => [...m, { role: "assistant", text }]);
+      }
     } catch (e) {
       if (!handledAsOff(e)) setChatErr(errMessage(e));
     } finally {
