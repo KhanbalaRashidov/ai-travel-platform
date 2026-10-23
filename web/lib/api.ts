@@ -293,6 +293,7 @@ export interface PlanQuoteReq {
   adults?: number;
   children?: number;
   infants?: number;
+  city_nights?: Record<string, number>; // per-city nights override (stepper)
 }
 
 export function planQuote(req: PlanQuoteReq): Promise<PlanQuote> {

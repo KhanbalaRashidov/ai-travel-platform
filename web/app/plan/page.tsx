@@ -40,6 +40,7 @@ interface Pending {
   adults: number;
   children: number;
   infants: number;
+  cityNights: Record<string, number>;
 }
 
 function sameNames(a: Place[], b: Place[]): boolean {
@@ -103,6 +104,7 @@ export default function PlanPage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [copied, setCopied] = useState(false);
   const [legModes, setLegModes] = useState<Record<string, string>>({});
+  const [cityNights, setCityNights] = useState<Record<string, number>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
@@ -136,7 +138,7 @@ export default function PlanPage() {
           places: pl, origin: null, budget: 0, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
           nights: 2, currency: d.cu ?? "EUR", order: undefined, legModes: {},
           startDate: d.d ?? "", returnDate: d.r ?? "",
-          adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0,
+          adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0, cityNights: {},
         });
       }
     } catch {
@@ -208,6 +210,7 @@ export default function PlanPage() {
         adults: p.adults,
         children: p.children,
         infants: p.infants,
+        city_nights: Object.keys(p.cityNights).length ? p.cityNights : undefined,
       });
       if (seq !== planSeq.current) return; // a newer request superseded this one
       setPlan(q);
@@ -269,6 +272,7 @@ export default function PlanPage() {
       adults,
       children,
       infants,
+      cityNights,
     };
   }
 
@@ -323,6 +327,23 @@ export default function PlanPage() {
     setCurrency(v);
     reprice({ currency: v });
   }
+  // Current nights for a city: user override, else the AI/date-allocated value
+  // from the last plan, else a sensible default.
+  const nightsFor = (name: string): number => {
+    if (cityNights[name] != null) return cityNights[name];
+    if (plan) {
+      const idx = (plan.order ?? []).findIndex((c) => c.toLowerCase() === name.toLowerCase());
+      if (idx >= 0 && (plan.nights_by_city?.[idx] ?? 0) > 0) return plan.nights_by_city![idx];
+    }
+    return 2;
+  };
+  // Per-city nights stepper (C8): set the override, re-price, and the roadmap's
+  // POIs auto-adjust (more nights -> more day POIs).
+  function changeCityNights(name: string, n: number) {
+    const next = { ...cityNights, [name]: Math.max(1, n) };
+    setCityNights(next);
+    if (plan) setPending({ ...base(plan.order), cityNights: next });
+  }
   // Passenger changes re-price the same order live (per-person + totals update).
   function changeAdults(v: number) {
     const n = Math.max(1, v);
@@ -374,6 +395,7 @@ export default function PlanPage() {
         adults,
         children,
         infants,
+        cityNights,
       });
     }
   }
@@ -544,6 +566,33 @@ export default function PlanPage() {
                   <span className="text-primary/50">⠿</span>
                   <PinIcon width={13} height={13} />
                   {p.name}
+                  {/* Per-city nights stepper (C8). */}
+                  <span
+                    className="ml-1 inline-flex items-center gap-1 rounded-full bg-surface px-1 py-0.5"
+                    title={t("plan.nightsHint")}
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => changeCityNights(p.name, nightsFor(p.name) - 1)}
+                      aria-label={`fewer nights in ${p.name}`}
+                      className="grid h-4 w-4 place-items-center rounded-full text-primary/70 hover:bg-primary/10 hover:text-primary"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-[2.2rem] text-center text-xs tabular-nums text-text">
+                      {t("res.nights", { n: nightsFor(p.name) })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => changeCityNights(p.name, nightsFor(p.name) + 1)}
+                      aria-label={`more nights in ${p.name}`}
+                      className="grid h-4 w-4 place-items-center rounded-full text-primary/70 hover:bg-primary/10 hover:text-primary"
+                    >
+                      +
+                    </button>
+                  </span>
                   <button
                     type="button"
                     onClick={() => removePlace(p.name)}
@@ -572,6 +621,7 @@ export default function PlanPage() {
               </Select>
             </Field>
           </div>
+          <p className="mt-1.5 text-xs text-muted">{t("plan.startHint")}</p>
 
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Field label={t("plan.comfort")}>

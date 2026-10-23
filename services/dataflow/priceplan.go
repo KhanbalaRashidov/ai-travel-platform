@@ -114,6 +114,11 @@ type PlanRequest struct {
 	Adults     int    `json:"adults"`
 	Children   int    `json:"children"`
 	Infants    int    `json:"infants"`
+
+	// CityNights overrides the per-destination night count, keyed by city name
+	// (the per-city stepper). Cities without an entry use the date-driven
+	// allocation / AI-recommended default.
+	CityNights map[string]int `json:"city_nights"`
 }
 
 // Geocoder builds a case-insensitive geocoder from the request's places, so the
@@ -498,6 +503,22 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		}
 	}
 	destNights, totalNights := allocateNightsN(len(hotelIdx), req, nights)
+	// Per-city override (C8): an explicit night count from the stepper wins over
+	// the allocation; the trip total is recomputed from the applied values.
+	if len(req.CityNights) > 0 {
+		lc := make(map[string]int, len(req.CityNights))
+		for name, n := range req.CityNights {
+			lc[strings.ToLower(strings.TrimSpace(name))] = n
+		}
+		total := 0
+		for k, oi := range hotelIdx {
+			if n, ok := lc[strings.ToLower(strings.TrimSpace(order[oi]))]; ok && n > 0 {
+				destNights[k] = n
+			}
+			total += destNights[k]
+		}
+		totalNights = total
+	}
 	nightsByCity := make([]int, len(order)) // origin stays 0
 	for k, oi := range hotelIdx {
 		nightsByCity[oi] = destNights[k]

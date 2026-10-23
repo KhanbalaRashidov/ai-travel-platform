@@ -204,6 +204,31 @@ func withCurrency(r PlanRequest, cur string) PlanRequest {
 	return r
 }
 
+func TestPlan_CityNightsOverride(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Tbilisi", "Istanbul"}, Start: "Baku",
+		Mode: "flight", Tier: "standard", Nights: 2, Currency: "EUR",
+		Order:      []string{"Baku", "Tbilisi", "Istanbul"},
+		CityNights: map[string]int{"Tbilisi": 5, "Istanbul": 1},
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	byCity := map[string]int{}
+	for i, c := range res.Order {
+		byCity[c] = res.NightsByCity[i]
+	}
+	if byCity["Tbilisi"] != 5 || byCity["Istanbul"] != 1 {
+		t.Fatalf("city-nights override not applied: %+v", byCity)
+	}
+	// No origin here, so Baku is a destination keeping its allocated nights (2);
+	// total = 2 (Baku) + 5 (Tbilisi) + 1 (Istanbul).
+	if byCity["Baku"] != 2 || res.Nights != 8 {
+		t.Fatalf("expected Baku=2 and total=8, got Baku=%d total=%d", byCity["Baku"], res.Nights)
+	}
+}
+
 // blockingFares is a FareResolver whose Quote never returns a result until the
 // context is cancelled — simulating a slow cold fetch.
 type blockingFares struct{ called chan struct{} }
