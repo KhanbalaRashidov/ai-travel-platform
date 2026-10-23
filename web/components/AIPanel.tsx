@@ -2,17 +2,18 @@
 
 import { useState } from "react";
 import {
-  AIResult,
   ApiError,
   chat as chatApi,
   EditState,
-  itinerary as itineraryApi,
   ItineraryBrief,
   refine as refineApi,
+  roadmap as roadmapApi,
+  Roadmap,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { Button, Card } from "./ui";
 import { SparkIcon } from "./icons";
+import { RoadmapCards } from "./RoadmapCards";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -36,7 +37,7 @@ export function AIPanel({
   const { t, locale } = useI18n();
   const [aiOff, setAiOff] = useState(false);
 
-  const [itin, setItin] = useState<AIResult | null>(null);
+  const [itin, setItin] = useState<Roadmap | null>(null);
   const [itinLoading, setItinLoading] = useState(false);
   const [itinErr, setItinErr] = useState<string | null>(null);
 
@@ -66,7 +67,8 @@ export function AIPanel({
     setItinLoading(true);
     setItinErr(null);
     try {
-      setItin(await itineraryApi(brief, locale));
+      const nbc = brief.nights_by_city ?? [];
+      setItin(await roadmapApi(brief.cities, nbc, brief.places ?? [], locale));
     } catch (e) {
       if (!handledAsOff(e)) setItinErr(errMessage(e));
     } finally {
@@ -138,7 +140,7 @@ export function AIPanel({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="space-y-4">
       {/* Itinerary writer */}
       <Card className="animate-fade-up">
         <div className="flex items-center justify-between">
@@ -178,14 +180,17 @@ export function AIPanel({
             </div>
           )}
           {itin && (
-            <>
-              <div className="whitespace-pre-wrap text-sm leading-relaxed text-text">{itin.text}</div>
-              {itin.violations && itin.violations.length > 0 && (
-                <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
-                  {t("ai.itin.violations")}
-                </p>
-              )}
-            </>
+            <RoadmapCards
+              roadmap={itin}
+              labels={{
+                day: (n) => t("res.day", { n }),
+                nights: (n) => t("res.nights", { n }),
+                season: t("res.season"),
+                free: t("res.free"),
+                approx: t("res.approx"),
+                maps: t("res.maps"),
+              }}
+            />
           )}
         </div>
       </Card>

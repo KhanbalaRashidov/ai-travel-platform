@@ -197,6 +197,11 @@ func (r *Resolver) fetchOne(ctx context.Context, s PriceSource, q LegQuery) []Ca
 			URL:       url,
 			Price:     conn.Money{Amount: p.Price, Currency: strings.ToUpper(strings.TrimSpace(p.Currency))},
 			FetchedAt: r.now().UTC(),
+			Operator:  strings.TrimSpace(p.Operator),
+			Depart:    strings.TrimSpace(p.Depart),
+			Duration:  strings.TrimSpace(p.Duration),
+			Stops:     strings.TrimSpace(p.Stops),
+			Baggage:   strings.TrimSpace(p.Baggage),
 		})
 	}
 	return out

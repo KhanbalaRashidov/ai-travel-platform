@@ -56,6 +56,13 @@ type LegAlt struct {
 	Price  float64 `json:"price"` // display currency
 	URL    string  `json:"url"`
 	Chosen bool    `json:"chosen"`
+
+	// Optional fare details, shown only when the source stated them.
+	Operator string `json:"operator,omitempty"`
+	Depart   string `json:"depart,omitempty"`
+	Duration string `json:"duration,omitempty"`
+	Stops    string `json:"stops,omitempty"`
+	Baggage  string `json:"baggage,omitempty"`
 }
 
 // LegQuote is one priced leg with provenance for the UI.
@@ -190,7 +197,10 @@ func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []
 		if link == "" {
 			link = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
 		}
-		alts = append(alts, LegAlt{Source: c.Source, Price: round2(d), URL: link, Chosen: eqFold(c.Source, q.Source)})
+		alts = append(alts, LegAlt{
+			Source: c.Source, Price: round2(d), URL: link, Chosen: eqFold(c.Source, q.Source),
+			Operator: c.Operator, Depart: c.Depart, Duration: c.Duration, Stops: c.Stops, Baggage: c.Baggage,
+		})
 	}
 	return LegQuote{
 		From: from, To: to, Mode: string(q.Mode),

@@ -33,12 +33,20 @@ type LegQuery struct {
 	Adults     int
 }
 
-// Candidate is one source's price for a leg, kept with provenance.
+// Candidate is one source's price for a leg, kept with provenance. The detail
+// fields (operator, times, baggage…) are optional: filled only when a source's
+// page actually states them, never invented.
 type Candidate struct {
 	Source    string     `json:"source"`
 	URL       string     `json:"url,omitempty"`
 	Price     conn.Money `json:"price"`
 	FetchedAt time.Time  `json:"fetched_at"`
+
+	Operator string `json:"operator,omitempty"` // airline / bus / rail operator
+	Depart   string `json:"depart,omitempty"`   // departure time, as printed
+	Duration string `json:"duration,omitempty"` // total trip duration, as printed
+	Stops    string `json:"stops,omitempty"`    // "direct" / "1 stop" …
+	Baggage  string `json:"baggage,omitempty"`  // included/extra + size/weight
 }
 
 // Converter normalizes currencies (planner.StaticConverter satisfies it).

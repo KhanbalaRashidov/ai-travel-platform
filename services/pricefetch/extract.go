@@ -10,20 +10,30 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
 )
 
-// Extracted is one price the model pulled out of a fetched page.
+// Extracted is one priced option the model pulled out of a fetched page. The
+// detail fields are optional and must come verbatim from the page text.
 type Extracted struct {
 	Price    float64 `json:"price"`
 	Currency string  `json:"currency"`
+	Operator string  `json:"operator,omitempty"`
+	Depart   string  `json:"depart,omitempty"`
+	Duration string  `json:"duration,omitempty"`
+	Stops    string  `json:"stops,omitempty"`
+	Baggage  string  `json:"baggage,omitempty"`
 }
 
 type extractEnvelope struct {
 	Prices []Extracted `json:"prices"`
 }
 
-const extractSystem = "You extract transport ticket prices from fetched web-page text. " +
-	"Return STRICT JSON: {\"prices\":[{\"price\":<number>,\"currency\":\"<ISO 4217>\"}]}. " +
-	"Include ONLY prices that appear literally in the text for traveling the given route. " +
-	"Never invent, estimate, convert or round a number. If none are present, return {\"prices\":[]}."
+const extractSystem = "You extract transport fares from fetched web-page text. " +
+	"Return STRICT JSON: {\"prices\":[{\"price\":<number>,\"currency\":\"<ISO 4217>\"," +
+	"\"operator\":\"\",\"depart\":\"\",\"duration\":\"\",\"stops\":\"\",\"baggage\":\"\"}]}. " +
+	"Include ONLY fares that appear literally in the text for traveling the given route. " +
+	"For each fare, also copy — ONLY if the text states it for that fare — the operator/airline, " +
+	"departure time, total duration, number of stops, and baggage allowance (verbatim). " +
+	"Leave a detail field empty when the text does not state it. " +
+	"Never invent, estimate, convert or round a number. If no fares are present, return {\"prices\":[]}."
 
 // maxChars caps how much page text we hand the model (cost + context limit).
 const maxChars = 12000

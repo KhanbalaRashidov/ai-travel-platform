@@ -399,9 +399,21 @@ export default function PlanPage() {
         .filter((p): p is MapPoint => !!p)
     : [];
 
+  // Per-stop airport flag (B1): mark a stop whose selected place is an airport.
+  const placeByName = (name: string) =>
+    places.find((p) => p.name.toLowerCase() === name.toLowerCase()) ??
+    (origin && origin.name.toLowerCase() === name.toLowerCase() ? origin : undefined);
+  const stopAirports = (plan?.order ?? []).map((name) => placeByName(name)?.kind === "airport");
+
   const aiBrief: ItineraryBrief | null = plan
     ? {
         cities: plan.order ?? [],
+        places: (plan.order ?? [])
+          .map((name) => {
+            const c = placeByName(name);
+            return c ? { name, lat: c.lat, lng: c.lng } : null;
+          })
+          .filter((p): p is { name: string; lat: number; lng: number } => !!p),
         legs: (plan.legs ?? []).map((l) => ({ from: l.from, to: l.to, mode: l.mode, price: l.price })),
         nights: plan.nights,
         nights_by_city: plan.nights_by_city,
@@ -657,6 +669,8 @@ export default function PlanPage() {
                     stops={plan.order ?? []}
                     legs={timelineLegs}
                     nights={plan.nights_by_city ?? []}
+                    airports={stopAirports}
+                    airportLabel={t("res.airport")}
                     nightLabel={(n) => t("res.nights", { n })}
                     modeOptions={modeOptions}
                   />
@@ -682,7 +696,7 @@ export default function PlanPage() {
                   activities={plan.activities}
                   currency={plan.currency}
                   fmt={fmt}
-                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen") }}
+                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen"), baggage: t("res.baggage") }}
                   catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities") }}
                 />
                 {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (

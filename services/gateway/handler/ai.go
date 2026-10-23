@@ -100,6 +100,48 @@ func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 	return httpx.OK(c, res)
 }
 
+type placeCoordDTO struct {
+	Name string  `json:"name"`
+	Lat  float64 `json:"lat"`
+	Lng  float64 `json:"lng"`
+}
+
+type roadmapReq struct {
+	Cities       []string        `json:"cities"`
+	NightsByCity []int           `json:"nights_by_city"`
+	Places       []placeCoordDTO `json:"places"`
+	Locale       string          `json:"locale"`
+}
+
+// Roadmap handles POST /ai/roadmap — a STRUCTURED, day-by-day, location-based
+// itinerary (per-city summary + season, day POIs with coords and free/paid
+// prices) the client renders as day cards + map pins, never raw markdown.
+// Transport/hotel prices are never invented here (guardrail); activity prices
+// are the model's approximate, "~"-marked estimates.
+func (h *AIHandler) Roadmap(c *fiber.Ctx) error {
+	if h.bulk == nil {
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured")
+	}
+	var req roadmapReq
+	if err := c.BodyParser(&req); err != nil || len(req.Cities) == 0 {
+		return httpx.Err(c, fiber.StatusBadRequest, "cities are required")
+	}
+	coords := make(map[string]ai.LatLng, len(req.Places))
+	for _, p := range req.Places {
+		if p.Lat != 0 || p.Lng != 0 {
+			coords[strings.ToLower(strings.TrimSpace(p.Name))] = ai.LatLng{Lat: p.Lat, Lng: p.Lng}
+		}
+	}
+	res, err := ai.StructuredRoadmap(c.Context(), h.bulk, req.Cities, req.NightsByCity, coords, langName(req.Locale))
+	if err != nil {
+		if ai.IsTransient(err) {
+			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
+		}
+		return httpx.Err(c, fiber.StatusBadGateway, "roadmap generation failed")
+	}
+	return httpx.OK(c, res)
+}
+
 type chatReq struct {
 	Message string `json:"message"`
 	Locale  string `json:"locale"`

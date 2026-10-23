@@ -118,6 +118,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// AI (Claude): itinerary writer + chat + conversational refine loop.
 	// 503 when the key is not configured.
 	v1.Post("/ai/itinerary", rl, aiH.Itinerary)
+	v1.Post("/ai/roadmap", rl, aiH.Roadmap)
 	v1.Post("/ai/chat", rl, aiH.Chat)
 	v1.Post("/ai/refine", rl, aiH.Refine)
 

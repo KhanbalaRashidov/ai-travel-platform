@@ -83,7 +83,7 @@ export function CostBreakdown({
   hotels: HotelLine[];
   activities: number;
   currency: string;
-  labels: { source: string; asOf: string; est: string; chosen: string };
+  labels: { source: string; asOf: string; est: string; chosen: string; baggage: string };
   catLabels: { transport: string; hotels: string; activities: string };
   fmt: (n: number) => string;
 }) {
@@ -112,15 +112,24 @@ export function CostBreakdown({
               labels={labels}
               fmt={fmt}
             >
-              {l.alternatives && l.alternatives.length > 1 && (
-                <ul className="mt-1 space-y-0.5 pl-3 text-xs text-muted">
+              {l.alternatives && l.alternatives.length > 0 && (
+                <ul className="mt-1 space-y-1 pl-3 text-xs text-muted">
                   {l.alternatives.map((a, j) => (
-                    <li key={j} className="flex items-center gap-2">
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        {a.source}
-                      </a>
-                      <span className="tabular-nums">{fmt(a.price)} {currency}</span>
-                      {a.chosen && <span className="text-success">✓ {labels.chosen}</span>}
+                    <li key={j} className="flex flex-col gap-0.5">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          {a.source} ↗
+                        </a>
+                        <span className="tabular-nums font-medium text-text">{fmt(a.price)} {currency}</span>
+                        {a.operator && <span>· {a.operator}</span>}
+                        {a.depart && <span>· {a.depart}</span>}
+                        {a.duration && <span>· {a.duration}</span>}
+                        {a.stops && <span>· {a.stops}</span>}
+                        {a.chosen && <span className="text-success">✓ {labels.chosen}</span>}
+                      </div>
+                      {a.baggage && (
+                        <div className="text-[11px] text-muted/80">🧳 {labels.baggage}: {a.baggage}</div>
+                      )}
                     </li>
                   ))}
                 </ul>

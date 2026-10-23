@@ -159,6 +159,12 @@ export interface LegAlt {
   price: number;
   url: string;
   chosen: boolean;
+  // Optional fare details, shown only when the source stated them.
+  operator?: string;
+  depart?: string;
+  duration?: string;
+  stops?: string;
+  baggage?: string;
 }
 
 export interface PlanLeg {
@@ -247,6 +253,7 @@ export interface AIResult {
 
 export interface ItineraryBrief {
   cities: string[];
+  places?: { name: string; lat: number; lng: number }[]; // city coords for roadmap pins
   legs: { from: string; to: string; mode: string; price: number }[];
   nights: number;
   nights_by_city?: number[];
@@ -263,6 +270,48 @@ export function itinerary(brief: ItineraryBrief, locale = "en"): Promise<AIResul
 
 export function chat(message: string, locale = "en"): Promise<AIResult> {
   return postJSON("/ai/chat", { message, locale });
+}
+
+// --- structured roadmap (§7): day-by-day, location-based, never raw markdown -
+
+export interface RoadmapPOI {
+  name: string;
+  type?: string;
+  desc?: string;
+  free: boolean;
+  price?: string; // approximate, "~"-marked (model knowledge), optional
+  lat?: number;
+  lng?: number;
+}
+
+export interface RoadmapDay {
+  day: number;
+  city: string;
+  title?: string;
+  pois: RoadmapPOI[];
+}
+
+export interface RoadmapCity {
+  city: string;
+  nights: number;
+  summary?: string;
+  best_season?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface Roadmap {
+  cities: RoadmapCity[];
+  days: RoadmapDay[];
+}
+
+export function roadmap(
+  cities: string[],
+  nights_by_city: number[],
+  places: { name: string; lat: number; lng: number }[],
+  locale = "en"
+): Promise<Roadmap> {
+  return postJSON("/ai/roadmap", { cities, nights_by_city, places, locale });
 }
 
 // Conversational refine: the backend LLM parses the edit, applies it
