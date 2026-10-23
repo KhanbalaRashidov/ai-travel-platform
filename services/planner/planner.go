@@ -1,11 +1,15 @@
-// Package planner will build the cost-optimal multi-country roadmap:
-// TSP-style city sequencing + per-leg flight/train/bus comparison +
-// day allocation + hotel tier selection + a deterministic live total.
+// Package planner is the cost-optimization engine. It separates two concerns
+// so the UI can re-price instantly:
 //
-// Split-ready: this package can later become its own service. Implemented in E3.
+//   - Sequencing (expensive): order cities to minimize transport cost as a
+//     fixed-start, optional-fixed-end TSP, evaluating both a round-trip
+//     (start==end) and an open-jaw (start!=end) variant and keeping the cheaper
+//     as best + the other as an alternative. Recomputed ONLY when the city set
+//     changes (see Sequencer's cache).
+//   - Pricing (cheap, deterministic): given a fixed order, the chosen per-leg
+//     modes, hotel tier/stars, nights and FX, compute the total breakdown.
+//     Re-run on every tier/star/mode toggle WITHOUT re-sequencing.
+//
+// All math is deterministic Go (never an LLM), so the live total is exact and
+// fast. Split-ready (E3).
 package planner
-
-// Service is the planning entry point. Concrete implementation lands in E3.
-type Service interface {
-	// Plan is a placeholder for the future planning API.
-}
