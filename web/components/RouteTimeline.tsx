@@ -6,6 +6,8 @@ export interface TimelineLeg {
   mode: string; // raw mode key: flight | train | bus
   label: string; // localized mode name
   price: string; // formatted price + currency
+  href?: string; // optional info/search deep-link
+  hrefLabel?: string; // localized label for the link
 }
 
 // Vertical, visual route: numbered stops connected by transport legs that carry
@@ -50,6 +52,19 @@ export function RouteTimeline({
                 <span>{legs[i].label}</span>
                 <span className="text-border">·</span>
                 <span className="font-semibold text-text">{legs[i].price}</span>
+                {legs[i].href && (
+                  <>
+                    <span className="text-border">·</span>
+                    <a
+                      href={legs[i].href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      {legs[i].hrefLabel ?? "search"} ↗
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           )}

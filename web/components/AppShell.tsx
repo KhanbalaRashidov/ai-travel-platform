@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-screen">
       <div className="aurora pointer-events-none absolute inset-x-0 top-0 h-96" />
-      <header className="sticky top-0 z-30 border-b border-border/70 bg-bg/80 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-bg/80 backdrop-blur-md print:hidden">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Brand />
           <div className="flex items-center gap-2">

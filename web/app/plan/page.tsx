@@ -92,6 +92,63 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
+  useEffect(() => {
+    try {
+      const token = new URLSearchParams(window.location.search).get("s");
+      if (!token) return;
+      const d = JSON.parse(decodeURIComponent(atob(token)));
+      const pl: Place[] = (d.p ?? []).map((x: Record<string, unknown>) => ({
+        name: String(x.n ?? ""),
+        lat: Number(x.a ?? 0),
+        lng: Number(x.o ?? 0),
+        code: String(x.c ?? ""),
+        country: String(x.co ?? ""),
+        kind: String(x.k ?? "city"),
+      }));
+      if (pl.length === 0) return;
+      const st = typeof d.s === "string" ? d.s : pl[0].name;
+      setPlaces(pl);
+      setStart(st);
+      if (d.d) setStartDate(d.d);
+      if (d.r) setReturnDate(d.r);
+      if (["budget", "standard", "vip"].includes(d.t)) setTier(d.t);
+      if (["cheapest", "flight", "train", "bus"].includes(d.m)) setPref(d.m);
+      if (d.cu) setCurrency(d.cu);
+      if (typeof d.ad === "number") setAdults(d.ad);
+      if (typeof d.ch === "number") setChildren(d.ch);
+      if (typeof d.inf === "number") setInfants(d.inf);
+      if (pl.length >= 2) {
+        setPending({
+          places: pl, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
+          nights: 2, currency: d.cu ?? "EUR", startDate: d.d ?? "", returnDate: d.r ?? "",
+          adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0,
+        });
+      }
+    } catch {
+      /* ignore a malformed share link */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function share() {
+    try {
+      const payload = {
+        p: places.map((x) => ({ n: x.name, a: x.lat, o: x.lng, c: x.code, co: x.country, k: x.kind })),
+        s: start, d: startDate, r: returnDate, t: tier, m: pref, cu: currency,
+        ad: adults, ch: children, inf: infants,
+      };
+      const token = btoa(encodeURIComponent(JSON.stringify(payload)));
+      const url = `${window.location.origin}${window.location.pathname}?s=${token}`;
+      void navigator.clipboard?.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard may be unavailable */
+    }
+  }
 
   async function fetchPlan(p: Pending) {
     if (p.places.length < 2) {
@@ -241,6 +298,9 @@ export default function PlanPage() {
           l.price > 0
             ? `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`
             : t("res.transfer"),
+        // Plain informational search link (no booking, no affiliate).
+        href: `https://www.google.com/search?q=${encodeURIComponent(`${l.from} to ${l.to} ${l.mode}`)}`,
+        hrefLabel: t("res.searchInfo"),
       }))
     : [];
 
@@ -295,7 +355,7 @@ export default function PlanPage() {
         </section>
 
         {/* Search wizard */}
-        <Card className="mt-6 animate-fade-up">
+        <Card className="mt-6 animate-fade-up print:hidden">
           <Field label={t("plan.cities")}>
             <CityAutocomplete
               onAdd={addPlace}
@@ -417,6 +477,14 @@ export default function PlanPage() {
         {/* Results */}
         {plan && (
           <section className="mt-6 space-y-4">
+            <div className="flex flex-wrap justify-end gap-2 print:hidden">
+              <Button variant="ghost" onClick={share}>
+                {copied ? t("res.copied") : t("res.share")}
+              </Button>
+              <Button variant="ghost" onClick={() => window.print()}>
+                {t("res.print")}
+              </Button>
+            </div>
             <div className="grid gap-4 lg:grid-cols-5">
               <Card className="animate-fade-up lg:col-span-3">
                 <div className="flex items-center justify-between">
@@ -461,7 +529,9 @@ export default function PlanPage() {
               <RouteMap points={mapPoints} closed={plan.variant === "round_trip"} />
             </Card>
 
-            <AIPanel brief={aiBrief} refineState={refineState} onRefine={(s) => applyRefine(s)} />
+            <div className="print:hidden">
+              <AIPanel brief={aiBrief} refineState={refineState} onRefine={(s) => applyRefine(s)} />
+            </div>
           </section>
         )}
       </main>
