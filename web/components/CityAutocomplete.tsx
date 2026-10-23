@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Place, searchPlaces } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 import { PinIcon } from "./icons";
 
 // CityAutocomplete is a debounced search box over the real places endpoint. It
@@ -15,6 +16,7 @@ export function CityAutocomplete({
   placeholder: string;
   isSelected: (name: string) => boolean;
 }) {
+  const { locale } = useI18n();
   const [q, setQ] = useState("");
   const [sug, setSug] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
@@ -31,7 +33,7 @@ export function CityAutocomplete({
     setLoading(true);
     const id = setTimeout(async () => {
       try {
-        const r = await searchPlaces(q);
+        const r = await searchPlaces(q, locale);
         if (active) {
           setSug(r ?? []);
           setOpen(true);
@@ -46,7 +48,7 @@ export function CityAutocomplete({
       active = false;
       clearTimeout(id);
     };
-  }, [q]);
+  }, [q, locale]);
 
   // Close on outside click.
   useEffect(() => {

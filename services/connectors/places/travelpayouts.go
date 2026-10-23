@@ -56,14 +56,17 @@ func New(doer HTTPDoer) *Client {
 // Name identifies the source for provenance.
 func (c *Client) Name() string { return sourceName }
 
-// Search returns places matching term (cities + airports), newest-first by
-// relevance (as the API orders them).
-func (c *Client) Search(ctx context.Context, term string, limit int) ([]Place, error) {
+// Search returns places matching term (cities + airports) in the given locale
+// (names localized by the API), newest-first by relevance.
+func (c *Client) Search(ctx context.Context, term, locale string, limit int) ([]Place, error) {
 	term = strings.TrimSpace(term)
 	if term == "" {
 		return nil, nil
 	}
-	u := fmt.Sprintf("%s?term=%s&locale=en&types[]=city&types[]=airport", c.baseURL, url.QueryEscape(term))
+	if locale == "" {
+		locale = "en"
+	}
+	u := fmt.Sprintf("%s?term=%s&locale=%s&types[]=city&types[]=airport", c.baseURL, url.QueryEscape(term), url.QueryEscape(locale))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err

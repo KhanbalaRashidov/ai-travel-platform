@@ -53,6 +53,21 @@ type itineraryReq struct {
 	HotelsTotal     float64      `json:"hotels_total"`
 	ActivitiesTotal float64      `json:"activities_total"`
 	Total           float64      `json:"total"`
+	Locale          string       `json:"locale"`
+}
+
+// langName maps a UI locale to the language the LLM should reply in.
+func langName(locale string) string {
+	switch strings.ToLower(strings.TrimSpace(locale)) {
+	case "az":
+		return "Azerbaijani"
+	case "ru":
+		return "Russian"
+	case "tr":
+		return "Turkish"
+	default:
+		return "English"
+	}
 }
 
 // Itinerary handles POST /ai/itinerary — turn a priced plan into prose. The LLM
@@ -70,7 +85,8 @@ func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 		legs[i] = ai.LegFact{From: l.From, To: l.To, Mode: l.Mode, Price: l.Price}
 	}
 	brief := ai.PlanBrief{
-		Cities: req.Cities, Legs: legs, Nights: req.Nights, NightsByCity: req.NightsByCity, Currency: req.Currency,
+		Cities: req.Cities, Legs: legs, Nights: req.Nights, NightsByCity: req.NightsByCity,
+		Language: langName(req.Locale), Currency: req.Currency,
 		TransportTotal: req.TransportTotal, HotelsTotal: req.HotelsTotal,
 		ActivitiesTotal: req.ActivitiesTotal, Total: req.Total,
 	}
@@ -86,6 +102,7 @@ func (h *AIHandler) Itinerary(c *fiber.Ctx) error {
 
 type chatReq struct {
 	Message string `json:"message"`
+	Locale  string `json:"locale"`
 }
 
 const chatSystem = "You are a helpful, concise travel assistant for an advisory-only planner " +
@@ -103,7 +120,7 @@ func (h *AIHandler) Chat(c *fiber.Ctx) error {
 		return httpx.Err(c, fiber.StatusBadRequest, "message is required")
 	}
 	orch := ai.NewOrchestrator(h.primary, 4, 1, h.tools...)
-	res, err := orch.Run(c.Context(), chatSystem, req.Message)
+	res, err := orch.Run(c.Context(), chatSystem+" Reply in "+langName(req.Locale)+".", req.Message)
 	if err != nil {
 		if ai.IsTransient(err) {
 			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)

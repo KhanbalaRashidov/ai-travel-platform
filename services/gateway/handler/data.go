@@ -150,12 +150,16 @@ func (h *DataHandler) Places(c *fiber.Ctx) error {
 	if len(q) < 2 {
 		return httpx.OK(c, []places.Place{})
 	}
-	key := "places|" + strings.ToLower(q)
+	locale := strings.ToLower(strings.TrimSpace(c.Query("locale")))
+	if locale == "" {
+		locale = "en"
+	}
+	key := "places|" + locale + "|" + strings.ToLower(q)
 	if cached, err := h.kv.Get(c.Context(), key); err == nil && cached != "" {
 		c.Set("Content-Type", "application/json")
 		return c.SendString(`{"success":true,"data":` + cached + `}`)
 	}
-	res, err := h.places.Search(c.Context(), q, 8)
+	res, err := h.places.Search(c.Context(), q, locale, 8)
 	if err != nil {
 		if errors.Is(err, conn.ErrUnavailable) {
 			return httpx.Err(c, fiber.StatusBadGateway, "autocomplete is unavailable")

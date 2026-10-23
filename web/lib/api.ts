@@ -134,8 +134,8 @@ export interface Place {
   kind: string; // "city" | "airport"
 }
 
-export function searchPlaces(q: string): Promise<Place[]> {
-  return getJSON(`/data/places?q=${encodeURIComponent(q)}`);
+export function searchPlaces(q: string, locale = "en"): Promise<Place[]> {
+  return getJSON(`/data/places?q=${encodeURIComponent(q)}&locale=${encodeURIComponent(locale)}`);
 }
 
 // track records a privacy-safe aggregate event (fire-and-forget, never throws).
@@ -229,12 +229,12 @@ export interface ItineraryBrief {
   total: number;
 }
 
-export function itinerary(brief: ItineraryBrief): Promise<AIResult> {
-  return postJSON("/ai/itinerary", brief);
+export function itinerary(brief: ItineraryBrief, locale = "en"): Promise<AIResult> {
+  return postJSON("/ai/itinerary", { ...brief, locale });
 }
 
-export function chat(message: string): Promise<AIResult> {
-  return postJSON("/ai/chat", { message });
+export function chat(message: string, locale = "en"): Promise<AIResult> {
+  return postJSON("/ai/chat", { message, locale });
 }
 
 // Conversational refine: the backend LLM parses the edit, applies it

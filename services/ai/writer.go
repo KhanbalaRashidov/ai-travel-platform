@@ -20,8 +20,9 @@ type LegFact struct {
 type PlanBrief struct {
 	Cities          []string
 	Legs            []LegFact
-	Nights          int   // total nights
-	NightsByCity    []int // aligned to Cities (optional)
+	Nights          int    // total nights
+	NightsByCity    []int  // aligned to Cities (optional)
+	Language        string // target language for the prose (optional; default English)
 	Currency        string
 	TransportTotal  float64
 	HotelsTotal     float64
@@ -83,9 +84,13 @@ const writerSystem = "You are a concise, friendly travel-itinerary writer for an
 // to the orchestrator.
 func WriteItinerary(ctx context.Context, llm LLM, b PlanBrief, maxRegen int) (Result, error) {
 	grounding := b.grounding()
+	instruction := "\nWrite the itinerary."
+	if l := strings.TrimSpace(b.Language); l != "" {
+		instruction = "\nWrite the itinerary in " + l + " (translate section labels and prose; keep city names and numbers)."
+	}
 	msgs := []Message{
 		{Role: RoleSystem, Content: writerSystem},
-		{Role: RoleUser, Content: "Plan facts:\n" + b.factSheet() + "\nWrite the itinerary."},
+		{Role: RoleUser, Content: "Plan facts:\n" + b.factSheet() + instruction},
 	}
 	regenLeft := maxRegen
 	for step := 1; ; step++ {

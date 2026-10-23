@@ -32,7 +32,7 @@ export function AIPanel({
   refineState: EditState | null;
   onRefine: (state: EditState, changed: string[]) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [aiOff, setAiOff] = useState(false);
 
   const [itin, setItin] = useState<AIResult | null>(null);
@@ -65,7 +65,7 @@ export function AIPanel({
     setItinLoading(true);
     setItinErr(null);
     try {
-      setItin(await itineraryApi(brief));
+      setItin(await itineraryApi(brief, locale));
     } catch (e) {
       if (!handledAsOff(e)) setItinErr(errMessage(e));
     } finally {
