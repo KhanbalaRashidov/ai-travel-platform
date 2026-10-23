@@ -29,10 +29,16 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	authSvc := service.NewAuthService(userRepo, jwtMgr)
 	authH := handler.NewAuthHandler(authSvc)
 
+	planH := handler.NewPlanHandler(service.NewPlanService())
+
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
 	v1.Post("/auth/login", authH.Login)
 	v1.Get("/me", auth.RequireAuth(jwtMgr), authH.Me)
+
+	// Cost-optimization engine (pure/stateless, public — advisory product).
+	v1.Post("/plan/sequence", planH.Sequence)
+	v1.Post("/plan/price", planH.Price)
 
 	return app
 }
