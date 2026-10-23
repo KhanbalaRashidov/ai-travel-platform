@@ -1,3 +1,156 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Design tokens. Colors are stored as space-separated RGB channels so Tailwind
+ * utilities keep opacity support (e.g. bg-primary/10) via rgb(var(--x)/<alpha>).
+ * Light is the default; .dark (set on <html>) and prefers-color-scheme flip it.
+ */
+:root {
+  --bg: 247 248 251;
+  --surface: 255 255 255;
+  --surface-2: 248 250 252;
+  --border: 226 232 240;
+  --text: 15 23 42;
+  --muted: 100 116 139;
+
+  --primary: 79 70 229;
+  --primary-strong: 67 56 202;
+  --primary-fg: 255 255 255;
+  --accent: 13 148 136;
+  --ring: 99 102 241;
+
+  --transport: 59 130 246;
+  --hotels: 139 92 246;
+  --activities: 20 184 166;
+
+  --success: 16 185 129;
+  --danger: 239 68 68;
+
+  --shadow-color: 15 23 42;
+}
+
+.dark {
+  --bg: 9 11 20;
+  --surface: 17 20 33;
+  --surface-2: 24 28 44;
+  --border: 39 44 63;
+  --text: 226 232 240;
+  --muted: 148 163 184;
+
+  --primary: 129 140 248;
+  --primary-strong: 99 102 241;
+  --primary-fg: 12 14 24;
+  --accent: 45 212 191;
+  --ring: 129 140 248;
+
+  --transport: 96 165 250;
+  --hotels: 167 139 250;
+  --activities: 45 212 191;
+
+  --success: 52 211 153;
+  --danger: 248 113 113;
+
+  --shadow-color: 0 0 0;
+}
+
+/* Honor the OS preference when the user has not explicitly chosen a theme. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --bg: 9 11 20;
+    --surface: 17 20 33;
+    --surface-2: 24 28 44;
+    --border: 39 44 63;
+    --text: 226 232 240;
+    --muted: 148 163 184;
+    --primary: 129 140 248;
+    --primary-strong: 99 102 241;
+    --primary-fg: 12 14 24;
+    --accent: 45 212 191;
+    --ring: 129 140 248;
+    --transport: 96 165 250;
+    --hotels: 167 139 250;
+    --activities: 45 212 191;
+    --success: 52 211 153;
+    --danger: 248 113 113;
+    --shadow-color: 0 0 0;
+  }
+}
+
+@layer base {
+  * {
+    border-color: rgb(var(--border));
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: rgb(var(--bg));
+    color: rgb(var(--text));
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: rgb(var(--primary) / 0.22);
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+  }
+  /* Subtle, modern scrollbar. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--muted) / 0.35);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--muted) / 0.55);
+  }
+}
+
+@layer components {
+  /* Ambient hero glow used behind the landing + wizard headers. */
+  .aurora {
+    background:
+      radial-gradient(42rem 42rem at 12% -10%, rgb(var(--primary) / 0.18), transparent 60%),
+      radial-gradient(38rem 38rem at 92% 0%, rgb(var(--accent) / 0.16), transparent 55%);
+  }
+  .card {
+    background-color: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgb(var(--shadow-color) / 0.04),
+      0 8px 24px -12px rgb(var(--shadow-color) / 0.12);
+  }
+}
+
+/* Leaflet overrides so the map matches the token system and dark mode. */
+.leaflet-container {
+  background: rgb(var(--surface-2));
+  font: inherit;
+}
+.dark .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+.leaflet-bar,
+.leaflet-control-attribution {
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

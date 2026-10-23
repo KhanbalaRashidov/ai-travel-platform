@@ -29,6 +29,19 @@ const MESSAGES: Record<Locale, Dict> = {
     "app.tagline":
       "Çox-ölkəli ən sərfəli marşrut — ən ucuz yol, tier üzrə otellər, gün-gün plan və canlı total. Yalnız məlumatlandırma.",
     "app.cta": "Marşrutu planla →",
+    "app.badge": "Yalnız məlumatlandırma — bron/ödəniş yoxdur",
+    "app.heroLead": "Şəhərləri seç — qalanını alqoritm həll edir.",
+    "feature.route.t": "Ən sərfəli sıra",
+    "feature.route.d": "Sabit başlanğıc/son node ilə TSP marşrutu; gediş-dönüş və açıq-çənə variantlarını müqayisə edir.",
+    "feature.cost.t": "Canlı xərc",
+    "feature.cost.d": "Nəqliyyat, otel və aktivliklər — rahatlıq dəyişdikcə total anında yenilənir.",
+    "feature.smart.t": "Özünü-böyüdən baza",
+    "feature.smart.d": "Qiymətlər real mənbələrdən keşlənir və hər axtarışla zənginləşir (mənbə + tarix etiketli).",
+    "plan.back": "← Ana səhifə",
+    "res.map": "Xəritə",
+    "res.planTitle": "Sənin marşrutun",
+    "res.emptyTitle": "Marşrut hələ hesablanmayıb",
+    "res.emptyDesc": "Şəhərləri seçib “Marşrutu hesabla”ya bas — nəticə burada görünəcək.",
     "plan.title": "Ən sərfəli marşrut",
     "plan.subtitle":
       "Şəhərləri seç, sistem ən ucuz sıranı çıxarır; rahatlıq/nəqliyyat dəyişdikcə total anında yenilənir.",
@@ -70,6 +83,19 @@ const MESSAGES: Record<Locale, Dict> = {
     "app.tagline":
       "Cost-optimal multi-country roadmaps — cheapest route, hotels by tier, day-by-day plan, live total. Advisory only.",
     "app.cta": "Plan a route →",
+    "app.badge": "Advisory only — no booking, no payment",
+    "app.heroLead": "Pick your cities — the algorithm handles the rest.",
+    "feature.route.t": "Cheapest order",
+    "feature.route.d": "Fixed start/end TSP routing; compares round-trip and open-jaw variants.",
+    "feature.cost.t": "Live cost",
+    "feature.cost.d": "Transport, hotels and activities — the total updates instantly as comfort changes.",
+    "feature.smart.t": "Self-growing data",
+    "feature.smart.d": "Prices are cached from real sources and enrich with every search (source + date tagged).",
+    "plan.back": "← Home",
+    "res.map": "Map",
+    "res.planTitle": "Your roadmap",
+    "res.emptyTitle": "No route yet",
+    "res.emptyDesc": "Pick cities and hit “Compute route” — your result will appear here.",
     "plan.title": "Cheapest route",
     "plan.subtitle":
       "Pick cities; the engine finds the cheapest order. Changing comfort/transport updates the total instantly.",
@@ -111,6 +137,19 @@ const MESSAGES: Record<Locale, Dict> = {
     "app.tagline":
       "Оптимальные по цене маршруты по нескольким странам — самый дешёвый путь, отели по уровню, план по дням, живой итог. Только информация.",
     "app.cta": "Спланировать маршрут →",
+    "app.badge": "Только информация — без брони и оплаты",
+    "app.heroLead": "Выберите города — остальное сделает алгоритм.",
+    "feature.route.t": "Самый дешёвый порядок",
+    "feature.route.d": "Маршрут TSP с фиксированным началом/концом; сравнивает туда-обратно и open-jaw.",
+    "feature.cost.t": "Живой расчёт",
+    "feature.cost.d": "Транспорт, отели и активности — итог обновляется мгновенно при смене комфорта.",
+    "feature.smart.t": "Саморазрастающаяся база",
+    "feature.smart.d": "Цены кэшируются из реальных источников и обогащаются с каждым поиском (метка источник+дата).",
+    "plan.back": "← На главную",
+    "res.map": "Карта",
+    "res.planTitle": "Ваш маршрут",
+    "res.emptyTitle": "Маршрут ещё не рассчитан",
+    "res.emptyDesc": "Выберите города и нажмите «Рассчитать маршрут» — результат появится здесь.",
     "plan.title": "Самый дешёвый маршрут",
     "plan.subtitle":
       "Выберите города; движок находит самый дешёвый порядок. Смена комфорта/транспорта мгновенно обновляет итог.",
@@ -152,6 +191,19 @@ const MESSAGES: Record<Locale, Dict> = {
     "app.tagline":
       "Çok ülkeli maliyet-optimal rotalar — en ucuz güzergah, seviyeye göre oteller, gün gün plan, canlı toplam. Yalnızca bilgi.",
     "app.cta": "Rota planla →",
+    "app.badge": "Yalnızca bilgi — rezervasyon/ödeme yok",
+    "app.heroLead": "Şehirleri seç — gerisini algoritma halleder.",
+    "feature.route.t": "En ucuz sıra",
+    "feature.route.d": "Sabit başlangıç/bitiş düğümlü TSP rotası; gidiş-dönüş ve open-jaw karşılaştırır.",
+    "feature.cost.t": "Canlı maliyet",
+    "feature.cost.d": "Ulaşım, otel ve aktiviteler — konfor değişince toplam anında güncellenir.",
+    "feature.smart.t": "Kendiliğinden büyüyen veri",
+    "feature.smart.d": "Fiyatlar gerçek kaynaklardan önbelleğe alınır ve her aramayla zenginleşir (kaynak + tarih etiketli).",
+    "plan.back": "← Ana sayfa",
+    "res.map": "Harita",
+    "res.planTitle": "Rotanız",
+    "res.emptyTitle": "Henüz rota yok",
+    "res.emptyDesc": "Şehirleri seçip “Rotayı hesapla”ya bas — sonucun burada görünecek.",
     "plan.title": "En ucuz rota",
     "plan.subtitle":
       "Şehirleri seç; motor en ucuz sırayı bulur. Konfor/ulaşım değişince toplam anında güncellenir.",
@@ -245,13 +297,16 @@ export function useI18n(): Ctx {
 export function LanguageSwitcher() {
   const { locale, setLocale } = useI18n();
   return (
-    <div className="flex gap-1">
+    <div className="flex items-center gap-0.5 rounded-full border border-border bg-surface p-0.5">
       {LOCALES.map((l) => (
         <button
           key={l}
           onClick={() => setLocale(l)}
-          className={`rounded px-2 py-0.5 text-xs ${
-            l === locale ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-600"
+          aria-pressed={l === locale}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+            l === locale
+              ? "bg-primary text-primary-fg shadow-soft"
+              : "text-muted hover:text-text"
           }`}
         >
           {LOCALE_LABEL[l]}

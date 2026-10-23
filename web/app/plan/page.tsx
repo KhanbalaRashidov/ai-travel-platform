@@ -23,12 +23,25 @@ import {
   RouteDTO,
   sequence,
 } from "../../lib/api";
-import { LanguageSwitcher, LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
+import { LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
+import { AppShell } from "../../components/AppShell";
+import { Badge, Button, Card, Chip, Field, NumberInput, Select } from "../../components/ui";
+import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
+import { CostDonut, CostSegment } from "../../components/CostDonut";
+import { RouteMap, MapPoint } from "../../components/RouteMap";
+import { PinIcon, RouteIcon, WalletIcon } from "../../components/icons";
+import Link from "next/link";
 
 interface Planned {
   cities: City[];
   route: RouteDTO;
   alt: RouteDTO;
+}
+
+interface UILeg {
+  mode: string; // raw mode key
+  label: string; // localized
+  price: number;
 }
 
 export default function PlanPage() {
@@ -42,7 +55,7 @@ export default function PlanPage() {
   const [currency, setCurrency] = useState<string>(LOCALE_CURRENCY[locale]);
 
   const [planned, setPlanned] = useState<Planned | null>(null);
-  const [legs, setLegs] = useState<Array<{ from: string; to: string; mode: string; price: number }>>([]);
+  const [legs, setLegs] = useState<UILeg[]>([]);
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +74,7 @@ export default function PlanPage() {
       const stars = TIER_STARS[tier];
       const nightly = NIGHTLY_BY_STAR[stars];
 
-      const uiLegs: Array<{ from: string; to: string; mode: string; price: number }> = [];
+      const uiLegs: UILeg[] = [];
       const apiLegs: PricedLeg[] = [];
       for (let i = 0; i + 1 < order.length; i++) {
         const a = p.cities[order[i]];
@@ -73,7 +86,7 @@ export default function PlanPage() {
           );
           return;
         }
-        uiLegs.push({ from: a.name, to: b.name, mode: t(`mode.${leg.mode}`), price: leg.price });
+        uiLegs.push({ mode: leg.mode, label: t(`mode.${leg.mode}`), price: leg.price });
         apiLegs.push({
           from: order[i],
           to: order[i + 1],
@@ -142,180 +155,190 @@ export default function PlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, pref, nights, currency]);
 
+  const fmt = (n: number) =>
+    n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const variantTone = (v: string) => (v === "open_jaw" ? "accent" : "primary");
   const variantLabel = (v: string) => (v === "open_jaw" ? t("res.openjaw") : t("res.roundtrip"));
-  const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  const timelineLegs: TimelineLeg[] = legs.map((l) => ({
+    mode: l.mode,
+    label: l.label,
+    price: `${fmt(l.price)} EUR`,
+  }));
+  const stops = planned ? planned.route.order.map((idx) => planned.cities[idx].name) : [];
+  const mapPoints: MapPoint[] = planned
+    ? planned.route.order.map((idx) => {
+        const c = planned.cities[idx];
+        return { name: c.name, lat: c.lat, lng: c.lng };
+      })
+    : [];
+
+  const segments: CostSegment[] = breakdown
+    ? [
+        { key: "transport", label: t("res.transport"), value: breakdown.transport, colorVar: "--transport" },
+        { key: "hotels", label: t("res.hotels"), value: breakdown.hotels, colorVar: "--hotels" },
+        { key: "activities", label: t("res.activities"), value: breakdown.activities, colorVar: "--activities" },
+      ]
+    : [];
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("plan.title")}</h1>
-          <p className="mt-1 text-sm text-gray-500">{t("plan.subtitle")}</p>
-        </div>
-        <LanguageSwitcher />
-      </div>
+    <AppShell>
+      <main className="mx-auto max-w-5xl px-4 pb-16">
+        <section className="pt-10">
+          <Link href="/" className="text-sm font-medium text-muted transition-colors hover:text-primary">
+            {t("plan.back")}
+          </Link>
+          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
+            {t("plan.title")}
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted">{t("plan.subtitle")}</p>
+        </section>
 
-      <section className="mt-6 space-y-4 rounded-lg border border-gray-200 p-4">
-        <div>
-          <div className="text-sm font-medium">{t("plan.cities")}</div>
-          <div className="mt-2 flex flex-wrap gap-2">
+        {/* Wizard */}
+        <Card className="mt-6 animate-fade-up">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <PinIcon width={16} height={16} className="text-primary" />
+            {t("plan.cities")}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
             {CITIES.map((c) => (
-              <button
-                key={c.code}
-                onClick={() => toggleCity(c.code)}
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  selected.includes(c.code)
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-300 text-gray-600"
-                }`}
-              >
+              <Chip key={c.code} active={selected.includes(c.code)} onClick={() => toggleCity(c.code)}>
                 {c.name}
-              </button>
+              </Chip>
             ))}
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <label className="text-sm">
-            {t("plan.start")}
-            <select
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className="mt-1 w-full rounded border border-gray-300 p-1.5"
-            >
-              {CITIES.filter((c) => selected.includes(c.code)).map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Field label={t("plan.start")}>
+              <Select value={start} onChange={(e) => setStart(e.target.value)}>
+                {CITIES.filter((c) => selected.includes(c.code)).map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t("plan.comfort")}>
+              <Select value={tier} onChange={(e) => setTier(e.target.value as Tier)}>
+                <option value="budget">{t("tier.budget")}</option>
+                <option value="standard">{t("tier.standard")}</option>
+                <option value="vip">{t("tier.vip")}</option>
+              </Select>
+            </Field>
+            <Field label={t("plan.transport")}>
+              <Select value={pref} onChange={(e) => setPref(e.target.value as ModePref)}>
+                <option value="cheapest">{t("mode.cheapest")}</option>
+                <option value="flight">{t("mode.flight")}</option>
+                <option value="train">{t("mode.train")}</option>
+                <option value="bus">{t("mode.bus")}</option>
+              </Select>
+            </Field>
+            <Field label={t("plan.nights")}>
+              <NumberInput
+                type="number"
+                min={1}
+                max={10}
+                value={nights}
+                onChange={(e) => setNights(Math.max(1, Number(e.target.value)))}
+              />
+            </Field>
+          </div>
 
-          <label className="text-sm">
-            {t("plan.comfort")}
-            <select
-              value={tier}
-              onChange={(e) => setTier(e.target.value as Tier)}
-              className="mt-1 w-full rounded border border-gray-300 p-1.5"
-            >
-              <option value="budget">{t("tier.budget")}</option>
-              <option value="standard">{t("tier.standard")}</option>
-              <option value="vip">{t("tier.vip")}</option>
-            </select>
-          </label>
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <Button onClick={onPlan} disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-fg/40 border-t-primary-fg" />
+                  {t("plan.calculating")}
+                </>
+              ) : (
+                <>
+                  <RouteIcon width={16} height={16} />
+                  {t("plan.calc")}
+                </>
+              )}
+            </Button>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              {t("plan.currency")}
+              <Select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-auto py-1.5"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </Select>
+            </label>
+          </div>
+        </Card>
 
-          <label className="text-sm">
-            {t("plan.transport")}
-            <select
-              value={pref}
-              onChange={(e) => setPref(e.target.value as ModePref)}
-              className="mt-1 w-full rounded border border-gray-300 p-1.5"
-            >
-              <option value="cheapest">{t("mode.cheapest")}</option>
-              <option value="flight">{t("mode.flight")}</option>
-              <option value="train">{t("mode.train")}</option>
-              <option value="bus">{t("mode.bus")}</option>
-            </select>
-          </label>
+        {error && (
+          <p className="mt-4 animate-fade-in rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            {error}
+          </p>
+        )}
 
-          <label className="text-sm">
-            {t("plan.nights")}
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={nights}
-              onChange={(e) => setNights(Math.max(1, Number(e.target.value)))}
-              className="mt-1 w-full rounded border border-gray-300 p-1.5"
-            />
-          </label>
-        </div>
+        {/* Empty state */}
+        {!planned && !error && (
+          <Card className="mt-6 flex flex-col items-center py-14 text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <RouteIcon width={26} height={26} />
+            </span>
+            <h2 className="mt-4 font-display text-lg font-bold">{t("res.emptyTitle")}</h2>
+            <p className="mt-1.5 max-w-sm text-sm text-muted">{t("res.emptyDesc")}</p>
+          </Card>
+        )}
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onPlan}
-            disabled={loading}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {loading ? t("plan.calculating") : t("plan.calc")}
-          </button>
-          <label className="text-sm text-gray-600">
-            {t("plan.currency")}{" "}
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="rounded border border-gray-300 p-1"
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
+        {/* Results */}
+        {planned && breakdown && (
+          <section className="mt-6 space-y-4">
+            <div className="grid gap-4 lg:grid-cols-5">
+              {/* Roadmap + timeline */}
+              <Card className="animate-fade-up lg:col-span-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-lg font-bold">{t("res.planTitle")}</h2>
+                  <Badge tone={variantTone(planned.route.variant)}>
+                    {variantLabel(planned.route.variant)}
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <RouteTimeline stops={stops} legs={timelineLegs} />
+                </div>
+                {planned.alt && planned.alt.order && planned.alt.order.length > 0 && (
+                  <p className="mt-4 border-t border-border pt-3 text-xs text-muted">
+                    {t("res.alt")} ({variantLabel(planned.alt.variant)}): ~{fmt(planned.alt.cost)} EUR
+                  </p>
+                )}
+              </Card>
 
-      {error && (
-        <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
-
-      {planned && breakdown && (
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">{t("res.route")}</h2>
-              <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {variantLabel(planned.route.variant)}
-              </span>
+              {/* Live cost */}
+              <Card className="animate-fade-up lg:col-span-2" >
+                <div className="flex items-center gap-2">
+                  <WalletIcon width={18} height={18} className="text-activities" />
+                  <h2 className="font-display text-lg font-bold">{t("res.liveCost")}</h2>
+                </div>
+                <div className="mt-5">
+                  <CostDonut
+                    segments={segments}
+                    total={breakdown.total}
+                    currency={breakdown.currency}
+                    fmt={fmt}
+                  />
+                </div>
+                <p className="mt-4 text-xs leading-relaxed text-muted">{t("res.disclaimer")}</p>
+              </Card>
             </div>
-            <ol className="mt-3 space-y-2 text-sm">
-              {planned.route.order.map((idx, i) => (
-                <li key={i}>
-                  <span className="font-medium">{planned.cities[idx].name}</span>
-                  {i < legs.length && (
-                    <span className="text-gray-500">
-                      {" "}→ {legs[i].mode} ({fmt(legs[i].price)} EUR)
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-            {planned.alt && planned.alt.order && planned.alt.order.length > 0 && (
-              <p className="mt-3 text-xs text-gray-400">
-                {t("res.alt")} ({variantLabel(planned.alt.variant)}): ~{fmt(planned.alt.cost)} EUR
-              </p>
-            )}
-          </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
-            <h2 className="font-semibold">
-              {t("res.liveCost")} ({breakdown.currency})
-            </h2>
-            <dl className="mt-3 space-y-1 text-sm">
-              <Row label={t("res.transport")} value={fmt(breakdown.transport)} />
-              <Row label={t("res.hotels")} value={fmt(breakdown.hotels)} />
-              <Row label={t("res.activities")} value={fmt(breakdown.activities)} />
-              <div className="mt-2 flex justify-between border-t pt-2 font-semibold">
-                <dt>{t("res.total")}</dt>
-                <dd>
-                  {fmt(breakdown.total)} {breakdown.currency}
-                </dd>
+            {/* Map */}
+            <Card className="animate-fade-up">
+              <div className="mb-3 flex items-center gap-2">
+                <PinIcon width={18} height={18} className="text-primary" />
+                <h2 className="font-display text-lg font-bold">{t("res.map")}</h2>
               </div>
-            </dl>
-            <p className="mt-3 text-xs text-gray-400">{t("res.disclaimer")}</p>
-          </div>
-        </section>
-      )}
-    </main>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between">
-      <dt className="text-gray-600">{label}</dt>
-      <dd>{value}</dd>
-    </div>
+              <RouteMap points={mapPoints} closed={planned.route.variant === "round_trip"} />
+            </Card>
+          </section>
+        )}
+      </main>
+    </AppShell>
   );
 }
