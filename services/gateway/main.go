@@ -14,6 +14,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/config"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/db"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 )
 
 func main() {
@@ -34,6 +35,14 @@ func main() {
 
 	jwtMgr := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTTTL)
 	defaultTenantID := loadDefaultTenantID(ctx, pool)
+
+	// Seed the starter destinations once (no-op if the tenant already has some),
+	// so the dynamic city list is populated on a fresh database.
+	if defaultTenantID != "" {
+		if err := knowledge.Seed(ctx, knowledge.NewPgStore(pool), defaultTenantID); err != nil {
+			log.Printf("warning: destination seed failed: %v", err)
+		}
+	}
 
 	app := buildApp(pool, rdb, jwtMgr, defaultTenantID)
 

@@ -17,6 +17,7 @@ import {
 } from "../../lib/sample";
 import {
   Breakdown,
+  destinations,
   PricedHotel,
   PricedLeg,
   price,
@@ -47,6 +48,9 @@ interface UILeg {
 export default function PlanPage() {
   const { t, locale } = useI18n();
 
+  // City list is dynamic: fetched from the knowledge base (GET /data/destinations)
+  // with the demo dataset as an offline fallback — no hardcoded chip list.
+  const [cityList, setCityList] = useState<City[]>(CITIES);
   const [selected, setSelected] = useState<string[]>(["BAK", "TBS", "IST"]);
   const [start, setStart] = useState("BAK");
   const [tier, setTier] = useState<Tier>("standard");
@@ -59,6 +63,34 @@ export default function PlanPage() {
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load the dynamic city list once. If the API is unreachable we keep the demo
+  // list, so the page stays fully functional offline.
+  useEffect(() => {
+    let cancelled = false;
+    destinations()
+      .then((ds) => {
+        if (cancelled || !ds || ds.length === 0) return;
+        const mapped: City[] = ds.map((d) => ({
+          code: d.city,
+          name: d.city,
+          lat: d.lat,
+          lng: d.lng,
+        }));
+        setCityList(mapped);
+        const codes = mapped.map((c) => c.code);
+        setSelected(codes.slice(0, Math.min(3, codes.length)));
+        setStart(codes[0]);
+        setPlanned(null);
+        setBreakdown(null);
+      })
+      .catch(() => {
+        /* API offline — keep the demo list */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function toggleCity(code: string) {
     setPlanned(null); // city-set change invalidates the sequence
@@ -131,7 +163,7 @@ export default function PlanPage() {
       setError(t("err.startInvalid"));
       return;
     }
-    const cities = CITIES.filter((c) => selected.includes(c.code));
+    const cities = cityList.filter((c) => selected.includes(c.code));
     const startIdx = cities.findIndex((c) => c.code === start);
     const matrix = buildMatrix(cities, pref);
     setLoading(true);
@@ -201,7 +233,7 @@ export default function PlanPage() {
             {t("plan.cities")}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {CITIES.map((c) => (
+            {cityList.map((c) => (
               <Chip key={c.code} active={selected.includes(c.code)} onClick={() => toggleCity(c.code)}>
                 {c.name}
               </Chip>
@@ -211,7 +243,7 @@ export default function PlanPage() {
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Field label={t("plan.start")}>
               <Select value={start} onChange={(e) => setStart(e.target.value)}>
-                {CITIES.filter((c) => selected.includes(c.code)).map((c) => (
+                {cityList.filter((c) => selected.includes(c.code)).map((c) => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </Select>

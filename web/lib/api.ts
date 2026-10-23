@@ -65,6 +65,28 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
   return json.data as T;
 }
 
+async function getJSON<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`);
+  const json = (await res.json()) as Envelope<T>;
+  if (!res.ok || json.success === false) {
+    throw new Error(json.error ?? `request failed (${res.status})`);
+  }
+  return json.data as T;
+}
+
+// Destination from the dynamic, knowledge-backed city list (GET /data/destinations).
+export interface DestinationDTO {
+  country: string;
+  city: string;
+  lat: number;
+  lng: number;
+  summary: string;
+}
+
+export function destinations(): Promise<DestinationDTO[]> {
+  return getJSON("/data/destinations");
+}
+
 export function sequence(
   matrix: number[][],
   start: number,

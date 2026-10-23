@@ -9,7 +9,11 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/auth"
+	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/cache"
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/tenant"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/poi"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/handler"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/repository"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/service"
@@ -31,7 +35,16 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	authH := handler.NewAuthHandler(authSvc)
 
 	planH := handler.NewPlanHandler(service.NewPlanService())
-	recH := handler.NewRecommendHandler(knowledge.NewService(knowledge.NewPgStore(pool)))
+
+	// Knowledge base (durable/warm) + data flywheel (hot->warm->cold) wiring.
+	kbStore := knowledge.NewPgStore(pool)
+	recH := handler.NewRecommendHandler(knowledge.NewService(kbStore))
+
+	kv := cache.NewRedisKV(rdb)
+	geo := knowledge.SeedGeocoder()
+	routeFW := dataflow.NewRouteFlywheel(kv, kbStore, estimate.New(geo, 0), 0)
+	poiSrc := poi.New(geo, nil, 0)
+	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore)
 
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
@@ -47,6 +60,11 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// Knowledge base: popularity-driven recommendations (data flywheel).
 	v1.Get("/recommendations", recH.List)
 	v1.Post("/recommendations/visit", recH.Visit)
+
+	// Real-data flywheel: cached transport quotes, dynamic destinations, POIs.
+	v1.Get("/data/transport", dataH.Transport)
+	v1.Get("/data/destinations", dataH.Destinations)
+	v1.Get("/data/poi", dataH.POIs)
 
 	return app
 }
