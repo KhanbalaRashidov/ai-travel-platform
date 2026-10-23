@@ -14,16 +14,17 @@ function asOf(iso?: string): string {
   return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
-function Line({
+function Row({
   left,
   value,
   currency,
   source,
   fetchedAt,
   estimated,
-  href,
+  url,
   labels,
   fmt,
+  children,
 }: {
   left: React.ReactNode;
   value: number;
@@ -31,9 +32,10 @@ function Line({
   source: string;
   fetchedAt?: string;
   estimated: boolean;
-  href?: string;
+  url?: string;
   labels: { source: string; asOf: string; est: string };
   fmt: (n: number) => string;
+  children?: React.ReactNode;
 }) {
   const src = sourceLabel(source);
   const date = asOf(fetchedAt);
@@ -54,18 +56,20 @@ function Line({
           </span>
         )}
         {date && <span>· {labels.asOf} {date}</span>}
-        {href && (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             ↗
           </a>
         )}
       </div>
+      {children}
     </li>
   );
 }
 
 // CostBreakdown renders expandable Transport / Hotels / Activities sections with
-// a per-line source + "as of" date, and marks sourceless lines "~ estimate".
+// each line's amount, REAL source deep-link + "as of", and — for transport — the
+// full provenance chain (every source checked, chosen one marked).
 export function CostBreakdown({
   legs,
   hotels,
@@ -74,18 +78,14 @@ export function CostBreakdown({
   labels,
   fmt,
   catLabels,
-  searchHref,
-  mapsHref,
 }: {
   legs: PlanLeg[];
   hotels: HotelLine[];
   activities: number;
   currency: string;
-  labels: { source: string; asOf: string; est: string };
+  labels: { source: string; asOf: string; est: string; chosen: string };
   catLabels: { transport: string; hotels: string; activities: string };
   fmt: (n: number) => string;
-  searchHref: (from: string, to: string, mode: string) => string;
-  mapsHref: (q: string) => string;
 }) {
   const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
   const section =
@@ -100,7 +100,7 @@ export function CostBreakdown({
         </summary>
         <ul className="mt-1">
           {legs.map((l, i) => (
-            <Line
+            <Row
               key={i}
               left={`${l.from} → ${l.to} · ${l.mode}`}
               value={l.price}
@@ -108,10 +108,24 @@ export function CostBreakdown({
               source={l.source}
               fetchedAt={l.fetched_at}
               estimated={l.estimated}
-              href={searchHref(l.from, l.to, l.mode)}
+              url={l.url}
               labels={labels}
               fmt={fmt}
-            />
+            >
+              {l.alternatives && l.alternatives.length > 1 && (
+                <ul className="mt-1 space-y-0.5 pl-3 text-xs text-muted">
+                  {l.alternatives.map((a, j) => (
+                    <li key={j} className="flex items-center gap-2">
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        {a.source}
+                      </a>
+                      <span className="tabular-nums">{fmt(a.price)} {currency}</span>
+                      {a.chosen && <span className="text-success">✓ {labels.chosen}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Row>
           ))}
         </ul>
       </details>
@@ -123,7 +137,7 @@ export function CostBreakdown({
         </summary>
         <ul className="mt-1">
           {hotels.map((h, i) => (
-            <Line
+            <Row
               key={i}
               left={`${h.city} · ${h.stars}★ · ${h.nights} × ${fmt(h.nightly)}`}
               value={h.total}
@@ -131,7 +145,7 @@ export function CostBreakdown({
               source={h.source}
               fetchedAt={h.fetched_at}
               estimated={h.estimated}
-              href={mapsHref(`${h.city} hotel`)}
+              url={h.url}
               labels={labels}
               fmt={fmt}
             />
@@ -145,7 +159,7 @@ export function CostBreakdown({
           <span className="tabular-nums">{fmt(activities)} {currency}</span>
         </summary>
         <ul className="mt-1">
-          <Line
+          <Row
             left={catLabels.activities}
             value={activities}
             currency={currency}

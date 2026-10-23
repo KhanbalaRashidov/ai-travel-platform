@@ -356,8 +356,8 @@ export default function PlanPage() {
           l.price > 0
             ? `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`
             : t("res.transfer"),
-        // Plain informational search link (no booking, no affiliate).
-        href: `https://www.google.com/search?q=${encodeURIComponent(`${l.from} to ${l.to} ${l.mode}`)}`,
+        // Real, route-prefilled source deep-link (never a generic search).
+        href: l.url,
         hrefLabel: t("res.searchInfo"),
         modeValue: legModes[`${l.from}|${l.to}`] ?? l.mode,
         onModeChange: (m: string) => changeLegMode(l.from, l.to, m),
@@ -651,10 +651,8 @@ export default function PlanPage() {
                   activities={plan.activities}
                   currency={plan.currency}
                   fmt={fmt}
-                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine") }}
+                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen") }}
                   catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities") }}
-                  searchHref={(f, to, m) => `https://www.google.com/search?q=${encodeURIComponent(`${f} to ${to} ${m}`)}`}
-                  mapsHref={(q) => `https://maps.google.com/?q=${encodeURIComponent(q)}`}
                 />
                 {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
                   <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">

@@ -120,11 +120,14 @@ func TestResolver_ExtractGuardCompare(t *testing.T) {
 	if !r.Enabled() {
 		t.Fatal("resolver with sources + llm should be enabled")
 	}
-	cand, ok := r.Quote(context.Background(), LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}, "EUR", "t1")
+	cand, chain, ok := r.Quote(context.Background(), LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}, "EUR", "t1")
 	if !ok {
 		t.Fatal("expected a candidate")
 	}
 	// 100 USD -> 90 EUR vs 120 EUR -> cheapest is source B's 100 USD.
+	if len(chain) != 2 {
+		t.Fatalf("provenance chain should include both sources, got %d", len(chain))
+	}
 	if cand.Source != "B" || cand.Price.Currency != "USD" || cand.Price.Amount != 100 {
 		t.Fatalf("expected cheapest = B 100 USD, got %+v", cand)
 	}
@@ -135,7 +138,7 @@ func TestResolver_DisabledWithoutSources(t *testing.T) {
 	if r.Enabled() {
 		t.Fatal("no sources -> disabled")
 	}
-	if _, ok := r.Quote(context.Background(), LegQuery{}, "EUR", "t1"); ok {
+	if _, _, ok := r.Quote(context.Background(), LegQuery{}, "EUR", "t1"); ok {
 		t.Fatal("disabled resolver must not return a candidate")
 	}
 }
@@ -144,7 +147,7 @@ func TestResolver_AllHallucinatedDropped(t *testing.T) {
 	src := fakeSource("A", "No prices on this page at all")
 	// The model returns 77 EUR, which is NOT in the fetched text -> guardrail drops it.
 	r := NewResolver([]PriceSource{src}, fixedLLM{body: `{"prices":[{"price":77,"currency":"EUR"}]}`}, conv(), nil, 0)
-	if _, ok := r.Quote(context.Background(), LegQuery{From: "A", To: "B"}, "EUR", "t1"); ok {
+	if _, _, ok := r.Quote(context.Background(), LegQuery{From: "A", To: "B"}, "EUR", "t1"); ok {
 		t.Fatal("a price absent from the text must be dropped -> no candidate")
 	}
 }
@@ -154,7 +157,7 @@ func TestResolver_WarmCacheHit(t *testing.T) {
 	warm := NewMemWarm()
 	r := NewResolver([]PriceSource{src}, extractLLM{}, conv(), nil, 0).WithWarm(warm)
 	q := LegQuery{From: "Baku", To: "Tbilisi", Mode: conn.ModeFlight}
-	if _, ok := r.Quote(context.Background(), q, "EUR", "t1"); !ok {
+	if _, _, ok := r.Quote(context.Background(), q, "EUR", "t1"); !ok {
 		t.Fatal("expected a candidate (cold)")
 	}
 	// Second call should be served from warm even if the source now fails.

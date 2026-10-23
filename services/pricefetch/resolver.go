@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -65,11 +66,13 @@ func cacheKey(q LegQuery, display string) string {
 	return strings.Join([]string{"fare", q.From, q.To, string(q.Mode), q.DepartDate, display}, "|")
 }
 
-// Quote returns the cheapest real candidate for the leg in `display` currency,
-// or ok=false when nothing could be fetched/verified.
-func (r *Resolver) Quote(ctx context.Context, q LegQuery, display, tenantID string) (Candidate, bool) {
+// Quote returns the cheapest real candidate for the leg plus the full provenance
+// chain (every source that was checked, cheapest first), or ok=false when
+// nothing could be fetched/verified. On a hot/warm cache hit the chain is just
+// the cached chosen candidate.
+func (r *Resolver) Quote(ctx context.Context, q LegQuery, display, tenantID string) (Candidate, []Candidate, bool) {
 	if !r.Enabled() {
-		return Candidate{}, false
+		return Candidate{}, nil, false
 	}
 	key := cacheKey(q, display)
 
@@ -78,7 +81,7 @@ func (r *Resolver) Quote(ctx context.Context, q LegQuery, display, tenantID stri
 		if raw, err := r.kv.Get(ctx, key); err == nil && raw != "" {
 			var c Candidate
 			if json.Unmarshal([]byte(raw), &c) == nil && c.Price.Amount > 0 {
-				return c, true
+				return c, []Candidate{c}, true
 			}
 		}
 	}
@@ -86,20 +89,34 @@ func (r *Resolver) Quote(ctx context.Context, q LegQuery, display, tenantID stri
 	if r.warm != nil {
 		if c, ok := r.warm.GetFare(ctx, tenantID, key); ok && c.Price.Amount > 0 {
 			r.setHot(ctx, key, c)
-			return c, true
+			return c, []Candidate{c}, true
 		}
 	}
 
 	// 3) Cold: parallel source fetch + extract + guardrail + compare.
-	best, ok := cheapest(r.gather(ctx, q), display, r.conv)
+	cands := r.gather(ctx, q)
+	best, ok := cheapest(cands, display, r.conv)
 	if !ok {
-		return Candidate{}, false
+		return Candidate{}, nil, false
 	}
+	sortByDisplay(cands, display, r.conv)
 	if r.warm != nil {
 		r.warm.PutFare(ctx, tenantID, key, best, r.ttl)
 	}
 	r.setHot(ctx, key, best)
-	return best, true
+	return best, cands, true
+}
+
+// sortByDisplay orders candidates cheapest-first in the display currency.
+func sortByDisplay(cands []Candidate, display string, conv Converter) {
+	val := func(c Candidate) float64 {
+		v, err := conv.Convert(c.Price.Amount, c.Price.Currency, display)
+		if err != nil {
+			return math.MaxFloat64
+		}
+		return v
+	}
+	sort.Slice(cands, func(i, j int) bool { return val(cands[i]) < val(cands[j]) })
 }
 
 func (r *Resolver) setHot(ctx context.Context, key string, c Candidate) {

@@ -45,19 +45,31 @@ type HotelLine struct {
 	Total     float64 `json:"total"`   // display currency
 	Estimated bool    `json:"estimated"`
 	Source    string  `json:"source"`
+	URL       string  `json:"url"`
 	FetchedAt string  `json:"fetched_at,omitempty"`
+}
+
+// LegAlt is one source's price for a leg, with its real deep-link (the
+// provenance chain: the chosen source + the others that were checked).
+type LegAlt struct {
+	Source string  `json:"source"`
+	Price  float64 `json:"price"` // display currency
+	URL    string  `json:"url"`
+	Chosen bool    `json:"chosen"`
 }
 
 // LegQuote is one priced leg with provenance for the UI.
 type LegQuote struct {
-	From       string  `json:"from"`
-	To         string  `json:"to"`
-	Mode       string  `json:"mode"`
-	Price      float64 `json:"price"` // display currency
-	Estimated  bool    `json:"estimated"`
-	Source     string  `json:"source"`
-	SourceTier string  `json:"source_tier"`
-	FetchedAt  string  `json:"fetched_at,omitempty"`
+	From         string   `json:"from"`
+	To           string   `json:"to"`
+	Mode         string   `json:"mode"`
+	Price        float64  `json:"price"` // display currency
+	Estimated    bool     `json:"estimated"`
+	Source       string   `json:"source"`
+	SourceTier   string   `json:"source_tier"`
+	URL          string   `json:"url"` // real, route-prefilled deep-link
+	Alternatives []LegAlt `json:"alternatives,omitempty"`
+	FetchedAt    string   `json:"fetched_at,omitempty"`
 }
 
 // PlaceCoord is a city the client selected via autocomplete, with coordinates,
@@ -135,7 +147,7 @@ type PlanResult struct {
 // satisfies it). When it returns a quote, it is preferred over the estimator.
 type FareResolver interface {
 	Enabled() bool
-	Quote(ctx context.Context, q pricefetch.LegQuery, display, tenantID string) (pricefetch.Candidate, bool)
+	Quote(ctx context.Context, q pricefetch.LegQuery, display, tenantID string) (pricefetch.Candidate, []pricefetch.Candidate, bool)
 }
 
 // PricePlanner composes the real fare resolver (preferred), the flywheel
@@ -158,6 +170,34 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 
 // WithFares attaches a real multi-source fare resolver (preferred over estimate).
 func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// legQuote builds a LegQuote with a REAL deep-link (the source's own page when
+// fetched, else a route-prefilled Rome2Rio link — never a generic search) and
+// the provenance chain (all sources checked, cheapest first, with the chosen one
+// marked). disp is the group price already converted to the display currency.
+func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []pricefetch.Candidate, tier Tier, disp float64, cur string, payable float64) LegQuote {
+	url := q.DeepLink
+	if url == "" {
+		url = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
+	}
+	alts := make([]LegAlt, 0, len(chain))
+	for _, c := range chain {
+		d, err := p.conv.Convert(c.Price.Amount*payable, c.Price.Currency, cur)
+		if err != nil {
+			continue
+		}
+		link := c.URL
+		if link == "" {
+			link = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
+		}
+		alts = append(alts, LegAlt{Source: c.Source, Price: round2(d), URL: link, Chosen: eqFold(c.Source, q.Source)})
+	}
+	return LegQuote{
+		From: from, To: to, Mode: string(q.Mode),
+		Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
+		URL: url, Alternatives: alts, FetchedAt: fetchedAtStr(q.FetchedAt),
+	}
+}
 
 // fetchedAtStr formats a provenance timestamp as RFC3339 (empty when zero).
 func fetchedAtStr(t time.Time) string {
@@ -207,9 +247,9 @@ func resolveMode(mode string) conn.TransportMode {
 
 // realLeg tries the real fare resolver for a leg, returning an EUR-normalized,
 // provenance-tagged quote (Estimated=false) on success.
-func (p *PricePlanner) realLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, bool) {
+func (p *PricePlanner) realLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, []pricefetch.Candidate, bool) {
 	if p.fares == nil || !p.fares.Enabled() {
-		return conn.TransportQuote{}, false
+		return conn.TransportQuote{}, nil, false
 	}
 	fc, _ := p.geo.Coords(from)
 	tc, _ := p.geo.Coords(to)
@@ -218,34 +258,35 @@ func (p *PricePlanner) realLeg(ctx context.Context, tenantID, from, to, mode str
 		FromLat: fc.Lat, FromLng: fc.Lng, ToLat: tc.Lat, ToLng: tc.Lng,
 		Mode: resolveMode(mode), DepartDate: p.tripDate, Adults: p.tripAdults,
 	}
-	cand, ok := p.fares.Quote(ctx, q, "EUR", tenantID)
+	cand, chain, ok := p.fares.Quote(ctx, q, "EUR", tenantID)
 	if !ok {
-		return conn.TransportQuote{}, false
+		return conn.TransportQuote{}, nil, false
 	}
 	eur, err := p.conv.Convert(cand.Price.Amount, cand.Price.Currency, "EUR")
 	if err != nil {
-		return conn.TransportQuote{}, false
+		return conn.TransportQuote{}, nil, false
 	}
 	return conn.TransportQuote{
 		From: from, To: to, Mode: q.Mode,
 		Price:      conn.Money{Amount: eur, Currency: "EUR"},
+		DeepLink:   cand.URL,
 		Provenance: conn.Provenance{Source: cand.Source, FetchedAt: cand.FetchedAt, Estimated: false},
-	}, true
+	}, chain, true
 }
 
 // cheapestLeg resolves the chosen transport quote for a leg: a real fetched
-// price when available, otherwise the flywheel (estimator). "cheapest" picks the
-// min across modes on the estimator path. Returns ok=false when nothing is viable.
-func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, Tier, bool) {
-	if q, ok := p.realLeg(ctx, tenantID, from, to, mode); ok {
-		return q, TierCold, true
+// price (+ its provenance chain) when available, otherwise the flywheel
+// (estimator). "cheapest" picks the min across modes on the estimator path.
+func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, []pricefetch.Candidate, Tier, bool) {
+	if q, chain, ok := p.realLeg(ctx, tenantID, from, to, mode); ok {
+		return q, chain, TierCold, true
 	}
 	if mode != "" && mode != "cheapest" {
 		q, tier, err := p.routes.Route(ctx, tenantID, from, to, conn.TransportMode(mode))
 		if err != nil {
-			return conn.TransportQuote{}, "", false
+			return conn.TransportQuote{}, nil, "", false
 		}
-		return q, tier, true
+		return q, nil, tier, true
 	}
 	var best conn.TransportQuote
 	var bestTier Tier
@@ -259,7 +300,7 @@ func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode
 			best, bestTier, found = q, tier, true
 		}
 	}
-	return best, bestTier, found
+	return best, nil, bestTier, found
 }
 
 // Plan prices a full trip. It resolves the city order (TSP, unless a matching
@@ -339,7 +380,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 				if i == j {
 					continue
 				}
-				q, _, ok := p.cheapestLeg(ctx, tenantID, known[i], known[j], req.Mode)
+				q, _, _, ok := p.cheapestLeg(ctx, tenantID, known[i], known[j], req.Mode)
 				if !ok {
 					m[i][j] = math.MaxFloat64
 					continue
@@ -370,7 +411,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if m, ok := req.LegModes[order[i]+"|"+order[i+1]]; ok && isValidLegMode(m) {
 			legMode = m
 		}
-		q, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], legMode)
+		q, chain, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], legMode)
 		if !ok {
 			return PlanResult{}, ErrLegUnavailable
 		}
@@ -383,11 +424,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if q.Estimated {
 			anyEstimated = true
 		}
-		legs = append(legs, LegQuote{
-			From: order[i], To: order[i+1], Mode: string(q.Mode),
-			Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
-			FetchedAt: fetchedAtStr(q.FetchedAt),
-		})
+		legs = append(legs, p.legQuote(order[i], order[i+1], q, chain, tier, disp, cur, payable))
 		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 	}
 
@@ -399,17 +436,13 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		if m, ok := req.LegModes[from+"|"+to]; ok && isValidLegMode(m) {
 			rm = m
 		}
-		if q, tier, ok := p.cheapestLeg(ctx, tenantID, from, to, rm); ok {
+		if q, chain, tier, ok := p.cheapestLeg(ctx, tenantID, from, to, rm); ok {
 			groupEUR := q.Price.Amount * payable
 			if disp, err := p.conv.Convert(groupEUR, q.Price.Currency, cur); err == nil {
 				if q.Estimated {
 					anyEstimated = true
 				}
-				legs = append(legs, LegQuote{
-					From: from, To: to, Mode: string(q.Mode),
-					Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
-					FetchedAt: fetchedAtStr(q.FetchedAt),
-				})
+				legs = append(legs, p.legQuote(from, to, q, chain, tier, disp, cur, payable))
 				priced = append(priced, planner.PricedLeg{From: len(order) - 1, To: 0, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 			}
 		}
@@ -451,6 +484,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 			City: city, Stars: h.Stars, Nights: nightsByCity[oi],
 			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[oi])),
 			Estimated: h.Estimated, Source: h.Source, FetchedAt: fetchedAtStr(h.FetchedAt),
+			URL: pricefetch.HotelLink(city, req.StartDate, req.ReturnDate, req.Adults),
 		})
 	}
 	activitiesEUR := activitiesPerNightEUR * float64(totalNights) * payable

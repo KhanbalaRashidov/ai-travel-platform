@@ -154,6 +154,13 @@ export function track(name: string): void {
 
 // --- priced plan (single source of truth: flywheel + estimator + engine) ----
 
+export interface LegAlt {
+  source: string;
+  price: number;
+  url: string;
+  chosen: boolean;
+}
+
 export interface PlanLeg {
   from: string;
   to: string;
@@ -162,6 +169,8 @@ export interface PlanLeg {
   estimated: boolean;
   source: string;
   source_tier: string;
+  url?: string;
+  alternatives?: LegAlt[];
   fetched_at?: string;
 }
 
@@ -173,6 +182,7 @@ export interface HotelLine {
   total: number;
   estimated: boolean;
   source: string;
+  url?: string;
   fetched_at?: string;
 }
 
