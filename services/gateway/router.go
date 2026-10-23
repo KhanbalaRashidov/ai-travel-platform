@@ -13,6 +13,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/handler"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/repository"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/service"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 )
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
@@ -30,6 +31,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	authH := handler.NewAuthHandler(authSvc)
 
 	planH := handler.NewPlanHandler(service.NewPlanService())
+	recH := handler.NewRecommendHandler(knowledge.NewService(knowledge.NewPgStore(pool)))
 
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
@@ -39,6 +41,10 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	// Cost-optimization engine (pure/stateless, public — advisory product).
 	v1.Post("/plan/sequence", planH.Sequence)
 	v1.Post("/plan/price", planH.Price)
+
+	// Knowledge base: popularity-driven recommendations (data flywheel).
+	v1.Get("/recommendations", recH.List)
+	v1.Post("/recommendations/visit", recH.Visit)
 
 	return app
 }

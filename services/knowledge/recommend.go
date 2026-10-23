@@ -27,6 +27,14 @@ func (s *Service) Learn(ctx context.Context, tenantID string, destinations []Des
 	return nil
 }
 
+// RecordVisit bumps a destination's popularity (defaults kind to "city").
+func (s *Service) RecordVisit(ctx context.Context, tenantID, destination, kind string) error {
+	if kind == "" {
+		kind = "city"
+	}
+	return s.store.RecordVisit(ctx, tenantID, destination, kind)
+}
+
 // Suggest returns dynamic recommendations from aggregate popularity
 // ("travelers like you chose ...").
 func (s *Service) Suggest(ctx context.Context, tenantID string, limit int) ([]Recommendation, error) {
