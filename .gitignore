@@ -1,0 +1,24 @@
+# secrets
+.env
+.env.local
+keys/
+*.pem
+*.key
+
+# go
+/bin/
+*.exe
+*.test
+*.out
+
+# node / next
+node_modules/
+.next/
+web/out/
+npm-debug.log*
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
