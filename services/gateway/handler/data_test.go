@@ -19,6 +19,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/pricefetch"
 )
 
 type fakePOI struct{ pois []conn.POI }
@@ -47,7 +48,8 @@ func dataApp(t *testing.T) *fiber.App {
 		body := `[{"code":"PAR","name":"Paris","country_name":"France","type":"city","coordinates":{"lat":48.85,"lon":2.35}}]`
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 	})
-	h := NewDataHandler(fw, poi, store, kv, conv, geo, places.New(placesDoer))
+	fares := pricefetch.NewResolver(nil, nil, conv, kv, 0) // disabled -> estimate fallback
+	h := NewDataHandler(fw, poi, store, kv, conv, geo, places.New(placesDoer), fares)
 
 	app := fiber.New()
 	app.Use(tenant.Middleware("t1"))

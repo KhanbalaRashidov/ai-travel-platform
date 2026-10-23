@@ -21,6 +21,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/service"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/pricefetch"
 )
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
@@ -57,7 +58,11 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 		"EUR": 1, "USD": 0.92, "AZN": 0.53, "TRY": 0.028, "RUB": 0.010, "GBP": 1.17,
 	}}
 	placesClient := places.New(nil)
-	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient)
+	// Real multi-source fare resolver. No sources are enabled by default (ToS-safe
+	// + token-less): the planner then falls back to the labeled estimate. Add a
+	// ToS-vetted pricefetch.PriceSource here to turn on real fetched prices.
+	fares := pricefetch.NewResolver(nil, aiPrimary, conv, kv, 0)
+	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.
 	aiH := handler.NewAIHandler(aiPrimary, aiBulk,

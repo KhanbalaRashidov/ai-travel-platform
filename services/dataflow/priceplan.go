@@ -8,6 +8,7 @@ import (
 
 	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/pricefetch"
 )
 
 // Errors returned by the priced planner.
@@ -106,13 +107,24 @@ type PlanResult struct {
 	AltCost            float64    `json:"alt_cost,omitempty"`
 }
 
-// PricePlanner composes the flywheel (transport), a hotel resolver (estimator)
-// and the TSP engine into one priced-plan computation.
+// FareResolver is the real multi-source price lookup (pricefetch.Resolver
+// satisfies it). When it returns a quote, it is preferred over the estimator.
+type FareResolver interface {
+	Enabled() bool
+	Quote(ctx context.Context, q pricefetch.LegQuery, display string) (pricefetch.Candidate, bool)
+}
+
+// PricePlanner composes the real fare resolver (preferred), the flywheel
+// (estimator fallback), a hotel resolver and the TSP engine into one priced plan.
 type PricePlanner struct {
 	routes *RouteFlywheel
 	hotels HotelResolver
 	geo    conn.Geocoder
 	conv   planner.Converter
+
+	fares      FareResolver // optional real-price source
+	tripDate   string       // per-call context for the fare resolver
+	tripAdults int
 }
 
 // NewPricePlanner wires the priced planner.
@@ -120,10 +132,56 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 	return &PricePlanner{routes: routes, hotels: hotels, geo: geo, conv: conv}
 }
 
-// cheapestLeg resolves the chosen transport quote for a leg under the request's
-// mode preference ("cheapest" picks the min across modes). Returns ok=false when
-// no mode is viable.
+// WithFares attaches a real multi-source fare resolver (preferred over estimate).
+func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// resolveMode maps "cheapest"/"" to a concrete mode for a fare lookup.
+func resolveMode(mode string) conn.TransportMode {
+	switch mode {
+	case "train":
+		return conn.ModeTrain
+	case "bus":
+		return conn.ModeBus
+	default:
+		return conn.ModeFlight
+	}
+}
+
+// realLeg tries the real fare resolver for a leg, returning an EUR-normalized,
+// provenance-tagged quote (Estimated=false) on success.
+func (p *PricePlanner) realLeg(ctx context.Context, from, to, mode string) (conn.TransportQuote, bool) {
+	if p.fares == nil || !p.fares.Enabled() {
+		return conn.TransportQuote{}, false
+	}
+	fc, _ := p.geo.Coords(from)
+	tc, _ := p.geo.Coords(to)
+	q := pricefetch.LegQuery{
+		From: from, To: to,
+		FromLat: fc.Lat, FromLng: fc.Lng, ToLat: tc.Lat, ToLng: tc.Lng,
+		Mode: resolveMode(mode), DepartDate: p.tripDate, Adults: p.tripAdults,
+	}
+	cand, ok := p.fares.Quote(ctx, q, "EUR")
+	if !ok {
+		return conn.TransportQuote{}, false
+	}
+	eur, err := p.conv.Convert(cand.Price.Amount, cand.Price.Currency, "EUR")
+	if err != nil {
+		return conn.TransportQuote{}, false
+	}
+	return conn.TransportQuote{
+		From: from, To: to, Mode: q.Mode,
+		Price:      conn.Money{Amount: eur, Currency: "EUR"},
+		Provenance: conn.Provenance{Source: cand.Source, FetchedAt: cand.FetchedAt, Estimated: false},
+	}, true
+}
+
+// cheapestLeg resolves the chosen transport quote for a leg: a real fetched
+// price when available, otherwise the flywheel (estimator). "cheapest" picks the
+// min across modes on the estimator path. Returns ok=false when nothing is viable.
 func (p *PricePlanner) cheapestLeg(ctx context.Context, tenantID, from, to, mode string) (conn.TransportQuote, Tier, bool) {
+	if q, ok := p.realLeg(ctx, from, to, mode); ok {
+		return q, TierCold, true
+	}
 	if mode != "" && mode != "cheapest" {
 		q, tier, err := p.routes.Route(ctx, tenantID, from, to, conn.TransportMode(mode))
 		if err != nil {
@@ -158,6 +216,8 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	if nights < 1 {
 		nights = 1
 	}
+	// Per-call context for the real fare resolver (date + party size).
+	p.tripDate, p.tripAdults = req.StartDate, req.Adults
 
 	// Keep only cities we can geolocate.
 	known := make([]string, 0, len(req.Cities))

@@ -18,6 +18,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/pricefetch"
 )
 
 // DataHandler serves flywheel-backed quotes, dynamic destinations/places, POIs
@@ -32,11 +33,12 @@ type DataHandler struct {
 	conv    planner.Converter
 	seedGeo conn.Geocoder
 	places  *places.Client
+	fares   *pricefetch.Resolver
 }
 
 // NewDataHandler wires the data handler.
-func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store, kv cache.KV, conv planner.Converter, seedGeo conn.Geocoder, pl *places.Client) *DataHandler {
-	return &DataHandler{routes: routes, poi: poi, store: store, kv: kv, conv: conv, seedGeo: seedGeo, places: pl}
+func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store, kv cache.KV, conv planner.Converter, seedGeo conn.Geocoder, pl *places.Client, fares *pricefetch.Resolver) *DataHandler {
+	return &DataHandler{routes: routes, poi: poi, store: store, kv: kv, conv: conv, seedGeo: seedGeo, places: pl, fares: fares}
 }
 
 // Plan handles POST /data/plan — a fully priced plan computed server-side: the
@@ -56,6 +58,9 @@ func (h *DataHandler) Plan(c *fiber.Ctx) error {
 	est := estimate.New(geo, 0)
 	fw := dataflow.NewRouteFlywheel(h.kv, h.store, est, 0)
 	pricing := dataflow.NewPricePlanner(fw, est, geo, h.conv)
+	if h.fares != nil {
+		pricing = pricing.WithFares(h.fares)
+	}
 
 	res, err := pricing.Plan(c.Context(), tenant.FromContext(c), req)
 	if err != nil {

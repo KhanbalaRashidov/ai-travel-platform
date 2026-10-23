@@ -21,6 +21,15 @@ func completeStructured(ctx context.Context, llm LLM, msgs []Message) (Completio
 	return llm.Complete(ctx, msgs, nil)
 }
 
+// CompleteStructured is the exported form of completeStructured, for other
+// packages (e.g. price extraction) that need JSON-mode output.
+func CompleteStructured(ctx context.Context, llm LLM, msgs []Message) (Completion, error) {
+	return completeStructured(ctx, llm, msgs)
+}
+
+// ExtractJSONObject is the exported, robust JSON-object extractor.
+func ExtractJSONObject(s string) string { return extractJSONObject(s) }
+
 // extractJSONObject returns the first balanced-ish JSON object in s: it strips
 // code fences, then takes the span from the first "{" to the last "}". This
 // tolerates a model that wraps JSON in prose despite instructions.
