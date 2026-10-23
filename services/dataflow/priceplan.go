@@ -36,6 +36,18 @@ var tierStars = map[string]int{"budget": 3, "standard": 4, "vip": 5}
 
 var transportModes = []conn.TransportMode{conn.ModeFlight, conn.ModeTrain, conn.ModeBus}
 
+// HotelLine is one priced hotel for the detailed cost panel.
+type HotelLine struct {
+	City      string  `json:"city"`
+	Stars     int     `json:"stars"`
+	Nights    int     `json:"nights"`
+	Nightly   float64 `json:"nightly"` // display currency
+	Total     float64 `json:"total"`   // display currency
+	Estimated bool    `json:"estimated"`
+	Source    string  `json:"source"`
+	FetchedAt string  `json:"fetched_at,omitempty"`
+}
+
 // LegQuote is one priced leg with provenance for the UI.
 type LegQuote struct {
 	From       string  `json:"from"`
@@ -45,6 +57,7 @@ type LegQuote struct {
 	Estimated  bool    `json:"estimated"`
 	Source     string  `json:"source"`
 	SourceTier string  `json:"source_tier"`
+	FetchedAt  string  `json:"fetched_at,omitempty"`
 }
 
 // PlaceCoord is a city the client selected via autocomplete, with coordinates,
@@ -96,23 +109,24 @@ func (r PlanRequest) Geocoder() conn.Geocoder {
 
 // PlanResult is the fully priced plan, all amounts in the display currency.
 type PlanResult struct {
-	Order              []string   `json:"order"`
-	Variant            string     `json:"variant"`
-	Legs               []LegQuote `json:"legs"`
-	Transport          float64    `json:"transport"`
-	Hotels             float64    `json:"hotels"`
-	Activities         float64    `json:"activities"`
-	Total              float64    `json:"total"`
-	Currency           string     `json:"currency"`
-	HotelStars         int        `json:"hotel_stars"`
-	Nights             int        `json:"nights"`         // total nights
-	NightsByCity       []int      `json:"nights_by_city"` // aligned to Order
-	Travelers          int        `json:"travelers"`
-	PerPerson          float64    `json:"per_person"`           // total / travelers
-	ActivitiesPerNight float64    `json:"activities_per_night"` // display currency
-	Estimated          bool       `json:"estimated"`
-	AltVariant         string     `json:"alt_variant,omitempty"`
-	AltCost            float64    `json:"alt_cost,omitempty"`
+	Order              []string    `json:"order"`
+	Variant            string      `json:"variant"`
+	Legs               []LegQuote  `json:"legs"`
+	HotelLines         []HotelLine `json:"hotel_lines"`
+	Transport          float64     `json:"transport"`
+	Hotels             float64     `json:"hotels"`
+	Activities         float64     `json:"activities"`
+	Total              float64     `json:"total"`
+	Currency           string      `json:"currency"`
+	HotelStars         int         `json:"hotel_stars"`
+	Nights             int         `json:"nights"`         // total nights
+	NightsByCity       []int       `json:"nights_by_city"` // aligned to Order
+	Travelers          int         `json:"travelers"`
+	PerPerson          float64     `json:"per_person"`           // total / travelers
+	ActivitiesPerNight float64     `json:"activities_per_night"` // display currency
+	Estimated          bool        `json:"estimated"`
+	AltVariant         string      `json:"alt_variant,omitempty"`
+	AltCost            float64     `json:"alt_cost,omitempty"`
 }
 
 // FareResolver is the real multi-source price lookup (pricefetch.Resolver
@@ -142,6 +156,14 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 
 // WithFares attaches a real multi-source fare resolver (preferred over estimate).
 func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// fetchedAtStr formats a provenance timestamp as RFC3339 (empty when zero).
+func fetchedAtStr(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
 
 // payablePax converts the party into payable-fare units: adults full, children
 // discounted (~75%), infants nearly free (~10%). At least 1.
@@ -343,6 +365,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		legs = append(legs, LegQuote{
 			From: order[i], To: order[i+1], Mode: string(q.Mode),
 			Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
+			FetchedAt: fetchedAtStr(q.FetchedAt),
 		})
 		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
 	}
@@ -358,6 +381,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		stars = 4
 	}
 	hotels := make([]planner.PricedHotel, 0, len(order))
+	hotelLines := make([]HotelLine, 0, len(order))
 	for i, city := range order {
 		h, err := p.hotels.Hotel(ctx, city, stars)
 		if err != nil {
@@ -367,6 +391,12 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 			anyEstimated = true
 		}
 		hotels = append(hotels, planner.PricedHotel{City: i, Stars: h.Stars, Nights: nightsByCity[i], Nightly: h.Nightly})
+		nightlyDisp, _ := p.conv.Convert(h.Nightly.Amount, h.Nightly.Currency, cur)
+		hotelLines = append(hotelLines, HotelLine{
+			City: city, Stars: h.Stars, Nights: nightsByCity[i],
+			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[i])),
+			Estimated: h.Estimated, Source: h.Source, FetchedAt: fetchedAtStr(h.FetchedAt),
+		})
 	}
 	activitiesEUR := activitiesPerNightEUR * float64(totalNights) * payable
 	anyEstimated = true // activities are always an estimate
@@ -384,7 +414,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 
 	actPerNightDisp, _ := p.conv.Convert(activitiesPerNightEUR, "EUR", cur)
 	res := PlanResult{
-		Order: order, Variant: variant, Legs: legs,
+		Order: order, Variant: variant, Legs: legs, HotelLines: hotelLines,
 		Transport: bd.Transport, Hotels: bd.Hotels, Activities: bd.Activities, Total: bd.Total,
 		Currency: cur, HotelStars: stars, Nights: totalNights, NightsByCity: nightsByCity,
 		Travelers: travelers, PerPerson: round2(bd.Total / float64(travelers)),

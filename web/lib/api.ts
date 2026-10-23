@@ -162,12 +162,25 @@ export interface PlanLeg {
   estimated: boolean;
   source: string;
   source_tier: string;
+  fetched_at?: string;
+}
+
+export interface HotelLine {
+  city: string;
+  stars: number;
+  nights: number;
+  nightly: number;
+  total: number;
+  estimated: boolean;
+  source: string;
+  fetched_at?: string;
 }
 
 export interface PlanQuote {
   order: string[];
   variant: string;
   legs: PlanLeg[];
+  hotel_lines?: HotelLine[];
   transport: number;
   hotels: number;
   activities: number;

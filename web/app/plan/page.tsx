@@ -16,6 +16,7 @@ import { Badge, Button, Card, Field, NumberInput, Select } from "../../component
 import { CityAutocomplete } from "../../components/CityAutocomplete";
 import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
 import { CostDonut, CostSegment } from "../../components/CostDonut";
+import { CostBreakdown } from "../../components/CostBreakdown";
 import { RouteMap, MapPoint } from "../../components/RouteMap";
 import { AIPanel } from "../../components/AIPanel";
 import { useToast } from "../../components/toast";
@@ -554,16 +555,24 @@ export default function PlanPage() {
               </Card>
 
               <Card className="animate-fade-up lg:col-span-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <WalletIcon width={18} height={18} className="text-activities" />
-                    <h2 className="font-display text-lg font-bold">{t("res.liveCost")}</h2>
-                  </div>
-                  {plan.estimated && <Badge tone="accent">{t("res.estimated")}</Badge>}
+                <div className="flex items-center gap-2">
+                  <WalletIcon width={18} height={18} className="text-activities" />
+                  <h2 className="font-display text-lg font-bold">{t("res.liveCost")}</h2>
                 </div>
                 <div className="mt-5">
                   <CostDonut segments={segments} total={plan.total} currency={plan.currency} fmt={fmt} />
                 </div>
+                <CostBreakdown
+                  legs={plan.legs ?? []}
+                  hotels={plan.hotel_lines ?? []}
+                  activities={plan.activities}
+                  currency={plan.currency}
+                  fmt={fmt}
+                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine") }}
+                  catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities") }}
+                  searchHref={(f, to, m) => `https://www.google.com/search?q=${encodeURIComponent(`${f} to ${to} ${m}`)}`}
+                  mapsHref={(q) => `https://maps.google.com/?q=${encodeURIComponent(q)}`}
+                />
                 {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
                   <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
                     <span className="text-muted">{t("res.perPerson")}</span>
