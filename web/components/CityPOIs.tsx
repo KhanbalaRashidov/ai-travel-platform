@@ -76,7 +76,26 @@ export function CityPOIs({ city }: { city: string }) {
                       <div className="truncate text-xs font-semibold" title={p.name}>
                         {p.name}
                       </div>
-                      <div className="truncate text-[11px] text-muted">{p.category}</div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-[11px] text-muted">{p.category}</span>
+                        {/* Rating only when a real source provided it — no fake stars. */}
+                        {typeof p.rating === "number" && p.rating > 0 && (
+                          <span className="shrink-0 text-[11px] text-accent">
+                            ★ {p.rating.toFixed(1)}
+                            {p.review_count ? ` (${p.review_count})` : ""}
+                          </span>
+                        )}
+                      </div>
+                      {p.desc && <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{p.desc}</p>}
+                      {(p.free || p.price) && (
+                        <div className="mt-0.5 text-[11px]">
+                          {p.free ? (
+                            <span className="font-medium text-success">{t("res.free")}</span>
+                          ) : (
+                            <span className="text-accent">{p.price || t("res.approx")}</span>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-1 flex flex-wrap gap-x-2 text-[11px]">
                         <a
                           href={mapsLink(p.name, p.city)}
@@ -101,7 +120,10 @@ export function CityPOIs({ city }: { city: string }) {
                   </div>
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] text-muted">{t("poi.source")}</p>
+              <p className="mt-1.5 text-[11px] text-muted">
+                {t("poi.source")}
+                {items.some((i) => i.provenance?.source === "ai-knowledge") ? ` · ${t("poi.sourceAI")}` : ""}
+              </p>
             </>
           )}
         </div>

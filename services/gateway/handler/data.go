@@ -173,14 +173,46 @@ func (h *DataHandler) POIs(c *fiber.Ctx) error {
 			limit = n
 		}
 	}
+	// Primary: open data (OSM Overpass). Many cities return nothing, so fall back
+	// to the model's knowledge of popular places (C9) — the list is rarely empty.
 	pois, err := h.poi.POIs(c.Context(), city, limit)
-	if err != nil {
-		if errors.Is(err, conn.ErrUnavailable) {
-			return httpx.Err(c, fiber.StatusBadGateway, "points of interest unavailable for this city")
-		}
+	if err != nil && !errors.Is(err, conn.ErrUnavailable) {
 		return httpx.Err(c, fiber.StatusInternalServerError, "could not load points of interest")
 	}
+	if len(pois) < limit && h.llm != nil {
+		pois = h.fillPOIsFromAI(c.Context(), city, limit, pois, c.Query("locale"))
+	}
 	return httpx.OK(c, pois)
+}
+
+// fillPOIsFromAI appends knowledge-based popular places (deduped by name) until
+// the list reaches limit. AI POIs carry Source="ai-knowledge", Estimated prices,
+// and NO rating (ratings are never invented).
+func (h *DataHandler) fillPOIsFromAI(ctx context.Context, city string, limit int, have []conn.POI, locale string) []conn.POI {
+	infos, err := ai.PopularPOIs(ctx, h.llm, city, langName(locale), limit)
+	if err != nil {
+		return have
+	}
+	seen := make(map[string]bool, len(have))
+	for _, p := range have {
+		seen[strings.ToLower(strings.TrimSpace(p.Name))] = true
+	}
+	now := time.Now().UTC()
+	for _, in := range infos {
+		if in.Name == "" || seen[strings.ToLower(in.Name)] {
+			continue
+		}
+		seen[strings.ToLower(in.Name)] = true
+		have = append(have, conn.POI{
+			City: city, Name: in.Name, Category: in.Category,
+			Desc: in.Desc, Free: in.Free, Price: strings.TrimSpace(in.Price),
+			Provenance: conn.Provenance{Source: "ai-knowledge", FetchedAt: now, Estimated: true},
+		})
+		if len(have) >= limit {
+			break
+		}
+	}
+	return have
 }
 
 // Places handles GET /data/places?q= — city/airport autocomplete from the

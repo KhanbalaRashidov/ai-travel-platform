@@ -189,6 +189,12 @@ export interface POIItem {
   image?: string;
   website?: string;
   wiki?: string;
+  desc?: string;
+  free?: boolean;
+  price?: string;
+  rating?: number; // only when a real source provided it (no fake stars)
+  review_count?: number;
+  review_summary?: string;
   provenance?: { source: string; fetched_at?: string; estimated?: boolean };
 }
 

@@ -56,15 +56,23 @@ type HotelQuote struct {
 
 // POI is a point of interest.
 type POI struct {
-	City       string  `json:"city"`
-	Name       string  `json:"name"`
-	Category   string  `json:"category"`
-	Lat        float64 `json:"lat"`
-	Lng        float64 `json:"lng"`
-	Image      string  `json:"image,omitempty"`   // free image URL (OSM image / Wikimedia Commons)
-	Website    string  `json:"website,omitempty"` // official site, when tagged
-	Wiki       string  `json:"wiki,omitempty"`    // Wikipedia article URL, when tagged
-	Provenance `json:"provenance"`
+	City     string  `json:"city"`
+	Name     string  `json:"name"`
+	Category string  `json:"category"`
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	Image    string  `json:"image,omitempty"`   // free image URL (OSM image / Wikimedia Commons)
+	Website  string  `json:"website,omitempty"` // official site, when tagged
+	Wiki     string  `json:"wiki,omitempty"`    // Wikipedia article URL, when tagged
+	Desc     string  `json:"desc,omitempty"`    // short description (AI/knowledge POIs)
+	Free     bool    `json:"free,omitempty"`    // true = no entry fee
+	Price    string  `json:"price,omitempty"`   // approximate "~"-marked entry price
+	// Rating fields are populated ONLY from a real source (never invented); when
+	// no source provides them they stay zero/empty (no fake stars).
+	Rating        float64 `json:"rating,omitempty"`
+	ReviewCount   int     `json:"review_count,omitempty"`
+	ReviewSummary string  `json:"review_summary,omitempty"`
+	Provenance    `json:"provenance"`
 }
 
 // FxRate is a conversion rate base -> quote (1 base = Rate quote).
