@@ -148,6 +148,8 @@ type PlanResult struct {
 	Estimated          bool        `json:"estimated"`
 	AltVariant         string      `json:"alt_variant,omitempty"`
 	AltCost            float64     `json:"alt_cost,omitempty"`
+	AltOrder           []string    `json:"alt_order,omitempty"`          // alternative's city sequence
+	AltNightsByCity    []int       `json:"alt_nights_by_city,omitempty"` // aligned to AltOrder
 }
 
 // FareResolver is the real multi-source price lookup (pricefetch.Resolver
@@ -535,7 +537,12 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	}
 	if altVariant != "" {
 		if c, err := p.conv.Convert(altCostEUR, "EUR", cur); err == nil {
+			// The alternative shares the city sequence/nights (it differs by
+			// variant: round-trip return leg vs open-jaw), so surface its full
+			// order + night split + total for the UI (C5).
 			res.AltVariant, res.AltCost = altVariant, round2(c)
+			res.AltOrder = append([]string(nil), order...)
+			res.AltNightsByCity = append([]int(nil), nightsByCity...)
 		}
 	}
 	return res, nil

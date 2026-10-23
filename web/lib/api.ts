@@ -271,6 +271,8 @@ export interface PlanQuote {
   estimated: boolean;
   alt_variant?: string;
   alt_cost?: number;
+  alt_order?: string[];
+  alt_nights_by_city?: number[];
 }
 
 export interface PlanQuoteReq {

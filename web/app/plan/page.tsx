@@ -692,9 +692,35 @@ export default function PlanPage() {
                   />
                 </div>
                 {plan.alt_variant && (
-                  <p className="mt-4 border-t border-border pt-3 text-xs text-muted">
-                    {t("res.alt")} ({variantLabel(plan.alt_variant)}): ~{fmt(plan.alt_cost ?? 0)} {plan.currency}
-                  </p>
+                  <div className="mt-4 border-t border-border pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-muted">
+                        {t("res.alt")} · {variantLabel(plan.alt_variant)}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        ~{fmt(plan.alt_cost ?? 0)} {plan.currency}
+                      </span>
+                    </div>
+                    {plan.alt_order && plan.alt_order.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-muted">
+                        {plan.alt_order.map((city, i) => (
+                          <span key={i} className="inline-flex items-center gap-1">
+                            <span className="rounded-full bg-surface-2 px-2 py-0.5 font-medium text-text">{city}</span>
+                            {(plan.alt_nights_by_city?.[i] ?? 0) > 0 && (
+                              <span className="text-[11px]">{t("res.nights", { n: plan.alt_nights_by_city![i] })}</span>
+                            )}
+                            {i < plan.alt_order!.length - 1 && <span className="text-border">→</span>}
+                          </span>
+                        ))}
+                        {plan.alt_variant === "round_trip" && plan.alt_order[0] && (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-border">→</span>
+                            <span className="rounded-full bg-surface-2 px-2 py-0.5 font-medium text-text">{plan.alt_order[0]}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </Card>
 
