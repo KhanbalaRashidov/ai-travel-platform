@@ -46,14 +46,7 @@ Transient provider overload (Gemini 503/429 "high demand") is retried a few time
 ### Real prices (multi-source scraping + AI extraction)
 Set `PRICE_SOURCES` in `.env` (one `name | tos-note | url-template` per line; see `.env.example`) to fetch real prices from public pages. The pipeline: HTTP fetch (realistic UA) → the LLM extracts `{price,currency}` from the page text → a **verbatim guardrail** drops any number not present literally → FX-normalize and pick the cheapest with `source + fetched_at` → cache hot in Redis. Blocked/anti-bot pages (401/403/429/CAPTCHA) are **skipped gracefully — never bypassed**; if every source fails the plan falls back to the clearly-labeled `~ indicative` estimate. Scraping is the operator's ToS responsibility.
 
-JS-rendered pages need the optional headless renderer (Playwright/Chromium), compiled with a build tag and added to the image:
-```bash
-go get github.com/playwright-community/playwright-go
-go build -tags headless ./services/gateway          # links the headless renderer
-# in the image: install Chromium (headless, --no-sandbox is set for containers)
-go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps chromium
-```
-The default build/image stay lean (no Chromium); without the tag `NewHeadless()` returns nil and only HTTP fetching is used.
+JS-rendered pages are an extension point: the source layer already falls back to a headless `Renderer` when an HTTP fetch returns an empty/JS-only page. To enable it, implement `pricefetch.Renderer` with a browser automation library (e.g. a Chromium driver launched headless with `--no-sandbox` for containers) and pass it to `DefaultSources(...)` in the router (today `NewHeadless()` returns nil, so the default build/image stay lean — HTTP fetching only).
 
 ## Monorepo layout
 ```

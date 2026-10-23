@@ -36,6 +36,11 @@ type Config struct {
 	// "name | tos-note | url-template"); empty disables real fetching and the
 	// platform falls back to the labeled estimate.
 	PriceSources string
+
+	// CORSOrigins is a comma-separated allowlist for browsers ("*" in dev).
+	// RateLimitPerMin caps requests/min per IP on the AI + scrape endpoints.
+	CORSOrigins     string
+	RateLimitPerMin int
 }
 
 // Load reads configuration from the environment, applying sensible dev defaults.
@@ -60,6 +65,8 @@ func Load() Config {
 		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
 		AIBudgetUSD:         getenvFloat("AI_BUDGET_USD", 100),
 		PriceSources:        os.Getenv("PRICE_SOURCES"),
+		CORSOrigins:         getenv("CORS_ORIGINS", "*"),
+		RateLimitPerMin:     getenvInt("RATE_LIMIT_PER_MIN", 60),
 	}
 }
 

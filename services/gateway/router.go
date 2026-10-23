@@ -1,8 +1,11 @@
 package main
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,10 +29,16 @@ import (
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
 // aiPrimary/aiBulk are nil when the Anthropic key is not configured.
-func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM, priceSources string) *fiber.App {
+func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, defaultTenantID string, aiPrimary, aiBulk ai.LLM, priceSources, corsOrigins string, rateMax int) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "ai-travel-gateway"})
-	app.Use(recover.New(), logger.New(), cors.New())
+	app.Use(recover.New(), logger.New(), cors.New(cors.Config{AllowOrigins: corsOrigins}))
 	app.Use(tenant.Middleware(defaultTenantID))
+
+	// Rate limiter for the expensive AI + scrape endpoints (per-IP, per-minute).
+	if rateMax <= 0 {
+		rateMax = 60
+	}
+	rl := limiter.New(limiter.Config{Max: rateMax, Expiration: time.Minute})
 
 	health := handler.NewHealthHandler(pool, rdb)
 	app.Get("/health", health.Health)
@@ -95,14 +104,14 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Get("/data/transport", dataH.Transport)
 	v1.Get("/data/destinations", dataH.Destinations)
 	v1.Get("/data/poi", dataH.POIs)
-	v1.Get("/data/places", dataH.Places)
-	v1.Post("/data/plan", dataH.Plan)
+	v1.Get("/data/places", rl, dataH.Places)
+	v1.Post("/data/plan", rl, dataH.Plan)
 
 	// AI (Claude): itinerary writer + chat + conversational refine loop.
 	// 503 when the key is not configured.
-	v1.Post("/ai/itinerary", aiH.Itinerary)
-	v1.Post("/ai/chat", aiH.Chat)
-	v1.Post("/ai/refine", aiH.Refine)
+	v1.Post("/ai/itinerary", rl, aiH.Itinerary)
+	v1.Post("/ai/chat", rl, aiH.Chat)
+	v1.Post("/ai/refine", rl, aiH.Refine)
 
 	// Privacy-safe aggregate usage analytics (allowlisted events only).
 	v1.Post("/analytics/event", analyticsH.Event)

@@ -31,15 +31,12 @@ See `.env.example` for the full list. Key groups:
 
 Secrets live only in `.env` (gitignored); never commit keys.
 
-## Headless rendering (optional)
-JS-rendered price pages need the Playwright/Chromium renderer, compiled with a
-build tag so the default image stays lean:
-```bash
-go get github.com/playwright-community/playwright-go
-go build -tags headless ./services/gateway
-go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps chromium
-```
-Container flags `--no-sandbox` are set automatically.
+## Headless rendering (extension point)
+JS-rendered price pages are supported via the `pricefetch.Renderer` interface:
+the source layer falls back to a headless renderer when an HTTP fetch returns an
+empty/JS-only page. The default build ships HTTP-only (`NewHeadless()` → nil) so
+the image stays lean. To enable, implement `Renderer` with a Chromium driver
+(headless, `--no-sandbox` in containers) and wire it into `DefaultSources(...)`.
 
 ## Health, logs, metrics
 - `GET /health` (liveness), `GET /ready` (DB + Redis readiness).
