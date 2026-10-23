@@ -71,6 +71,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.total": "Cəmi",
     "res.disclaimer":
       "Qiymətlər indikativdir (demo data). Dəyişikliklər yalnız yenidən qiymətləndirir — marşrut sırası dəyişmir.",
+    "res.estimated": "~ indikativ",
     "ai.title": "AI köməkçi",
     "ai.itin.title": "Gün-gün marşrut (AI)",
     "ai.itin.generate": "AI ilə marşrut yarat",
@@ -142,6 +143,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.total": "Total",
     "res.disclaimer":
       "Prices are indicative (demo data). Changes only re-price — the route order does not change.",
+    "res.estimated": "~ indicative",
     "ai.title": "AI assistant",
     "ai.itin.title": "Day-by-day itinerary (AI)",
     "ai.itin.generate": "Generate with AI",
@@ -213,6 +215,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.total": "Итого",
     "res.disclaimer":
       "Цены ориентировочные (демо-данные). Изменения только пересчитывают — порядок маршрута не меняется.",
+    "res.estimated": "~ ориентир.",
     "ai.title": "AI-ассистент",
     "ai.itin.title": "План по дням (AI)",
     "ai.itin.generate": "Сгенерировать с AI",
@@ -284,6 +287,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.total": "Toplam",
     "res.disclaimer":
       "Fiyatlar göstergeseldir (demo veri). Değişiklikler yalnızca yeniden fiyatlandırır — rota sırası değişmez.",
+    "res.estimated": "~ gösterge",
     "ai.title": "AI asistan",
     "ai.itin.title": "Gün gün rota (AI)",
     "ai.itin.generate": "AI ile oluştur",

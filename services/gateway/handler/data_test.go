@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,6 +17,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/dataflow"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
 )
 
 type fakePOI struct{ pois []conn.POI }
@@ -35,16 +37,57 @@ func dataApp(t *testing.T) *fiber.App {
 		t.Fatal(err)
 	}
 	geo := knowledge.SeedGeocoder()
-	fw := dataflow.NewRouteFlywheel(cache.NewMemKV(), store, estimate.New(geo, 0), 0)
+	est := estimate.New(geo, 0)
+	fw := dataflow.NewRouteFlywheel(cache.NewMemKV(), store, est, 0)
 	poi := fakePOI{pois: []conn.POI{{City: "Baku", Name: "Old City", Category: "attraction"}}}
-	h := NewDataHandler(fw, poi, store)
+	conv := planner.StaticConverter{Rates: map[string]float64{"EUR": 1, "USD": 0.92, "AZN": 0.53}}
+	pp := dataflow.NewPricePlanner(fw, est, geo, conv)
+	h := NewDataHandler(fw, poi, store, pp)
 
 	app := fiber.New()
 	app.Use(tenant.Middleware("t1"))
 	app.Get("/data/transport", h.Transport)
 	app.Get("/data/destinations", h.Destinations)
 	app.Get("/data/poi", h.POIs)
+	app.Post("/data/plan", h.Plan)
 	return app
+}
+
+func TestPlanEndpoint_PricesFromFlywheel(t *testing.T) {
+	app := dataApp(t)
+	body := `{"cities":["Baku","Tbilisi","Istanbul"],"start":"Baku","mode":"cheapest","tier":"standard","nights":2,"currency":"EUR"}`
+	req := httptest.NewRequest(http.MethodPost, "/data/plan", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d: %s", resp.StatusCode, string(b))
+	}
+	var out struct {
+		Data struct {
+			Order     []string `json:"order"`
+			Legs      []map[string]any
+			Total     float64 `json:"total"`
+			Estimated bool    `json:"estimated"`
+			Currency  string  `json:"currency"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Data.Order) != 3 || len(out.Data.Legs) != 2 {
+		t.Fatalf("expected 3 stops / 2 legs, got order=%v legs=%d", out.Data.Order, len(out.Data.Legs))
+	}
+	if out.Data.Total <= 0 || out.Data.Currency != "EUR" {
+		t.Fatalf("bad totals: total=%v cur=%s", out.Data.Total, out.Data.Currency)
+	}
+	if !out.Data.Estimated {
+		t.Fatal("estimator-backed plan must be flagged estimated")
+	}
 }
 
 func getJSON(t *testing.T, app *fiber.App, path string) map[string]any {

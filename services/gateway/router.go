@@ -19,6 +19,7 @@ import (
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/repository"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/gateway/service"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
 )
 
 // buildApp constructs the Fiber app and wires handler -> service -> repository.
@@ -47,7 +48,15 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	estimator := estimate.New(geo, 0)
 	routeFW := dataflow.NewRouteFlywheel(kv, kbStore, estimator, 0)
 	poiSrc := poi.New(geo, nil, 0)
-	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore)
+
+	// Single pricing source of truth: flywheel (transport) + estimator (hotels)
+	// + FX, priced server-side. Baseline FX (EUR numeraire); the FX connector
+	// refines rates when wired.
+	conv := planner.StaticConverter{Rates: map[string]float64{
+		"EUR": 1, "USD": 0.92, "AZN": 0.53, "TRY": 0.028, "RUB": 0.010, "GBP": 1.17,
+	}}
+	pricePlanner := dataflow.NewPricePlanner(routeFW, estimator, geo, conv)
+	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, pricePlanner)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.
 	aiH := handler.NewAIHandler(aiPrimary, aiBulk,
@@ -70,10 +79,12 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Get("/recommendations", recH.List)
 	v1.Post("/recommendations/visit", recH.Visit)
 
-	// Real-data flywheel: cached transport quotes, dynamic destinations, POIs.
+	// Real-data flywheel: cached transport quotes, dynamic destinations, POIs,
+	// and the full priced plan (single pricing source of truth).
 	v1.Get("/data/transport", dataH.Transport)
 	v1.Get("/data/destinations", dataH.Destinations)
 	v1.Get("/data/poi", dataH.POIs)
+	v1.Post("/data/plan", dataH.Plan)
 
 	// AI (Claude): itinerary writer + chat + conversational refine loop.
 	// 503 when the key is not configured.

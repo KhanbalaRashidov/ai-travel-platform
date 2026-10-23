@@ -103,6 +103,50 @@ export function destinations(): Promise<DestinationDTO[]> {
   return getJSON("/data/destinations");
 }
 
+// --- priced plan (single source of truth: flywheel + estimator + engine) ----
+
+export interface PlanLeg {
+  from: string;
+  to: string;
+  mode: string;
+  price: number;
+  estimated: boolean;
+  source: string;
+  source_tier: string;
+}
+
+export interface PlanQuote {
+  order: string[];
+  variant: string;
+  legs: PlanLeg[];
+  transport: number;
+  hotels: number;
+  activities: number;
+  total: number;
+  currency: string;
+  hotel_stars: number;
+  nights: number;
+  activities_per_night: number;
+  estimated: boolean;
+  alt_variant?: string;
+  alt_cost?: number;
+}
+
+export interface PlanQuoteReq {
+  cities: string[];
+  start: string;
+  mode: string;
+  tier: string;
+  nights: number;
+  currency: string;
+  order?: string[]; // supplied => re-price that order without re-sequencing
+  variant?: string;
+}
+
+export function planQuote(req: PlanQuoteReq): Promise<PlanQuote> {
+  return postJSON("/data/plan", req);
+}
+
 // --- AI (Claude) -----------------------------------------------------------
 
 export interface Violation {

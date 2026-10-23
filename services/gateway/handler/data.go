@@ -16,14 +16,38 @@ import (
 
 // DataHandler serves flywheel-backed quotes and knowledge-backed destinations.
 type DataHandler struct {
-	routes *dataflow.RouteFlywheel
-	poi    conn.POISource
-	store  knowledge.Store
+	routes  *dataflow.RouteFlywheel
+	poi     conn.POISource
+	store   knowledge.Store
+	pricing *dataflow.PricePlanner
 }
 
 // NewDataHandler wires the data handler.
-func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store) *DataHandler {
-	return &DataHandler{routes: routes, poi: poi, store: store}
+func NewDataHandler(routes *dataflow.RouteFlywheel, poi conn.POISource, store knowledge.Store, pricing *dataflow.PricePlanner) *DataHandler {
+	return &DataHandler{routes: routes, poi: poi, store: store, pricing: pricing}
+}
+
+// Plan handles POST /data/plan — a fully priced plan computed server-side: the
+// route (TSP), per-leg transport quotes (flywheel), hotels + activities
+// (estimator) and FX, all in one response with provenance/estimated flags. This
+// is the single source of truth for manual planning, tier/mode re-price and the
+// chat refine loop. Supplying `order` re-prices that order without re-sequencing.
+func (h *DataHandler) Plan(c *fiber.Ctx) error {
+	var req dataflow.PlanRequest
+	if err := c.BodyParser(&req); err != nil || len(req.Cities) < 2 {
+		return httpx.Err(c, fiber.StatusBadRequest, "at least 2 cities are required")
+	}
+	res, err := h.pricing.Plan(c.Context(), tenant.FromContext(c), req)
+	if err != nil {
+		if errors.Is(err, dataflow.ErrPlanTooFewCities) {
+			return httpx.Err(c, fiber.StatusBadRequest, "at least 2 known cities are required")
+		}
+		if errors.Is(err, dataflow.ErrLegUnavailable) {
+			return httpx.Err(c, fiber.StatusBadGateway, "no transport available for part of this route")
+		}
+		return httpx.Err(c, fiber.StatusInternalServerError, "could not price the plan")
+	}
+	return httpx.OK(c, res)
 }
 
 var validModes = map[string]conn.TransportMode{
