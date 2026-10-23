@@ -83,7 +83,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	priceSrcs := pricefetch.DefaultSources(priceSources, pricefetch.NewHTTPRenderer(nil), pricefetch.NewHeadless())
 	fares := pricefetch.NewResolver(priceSrcs, aiPrimary, conv, kv, 0).
 		WithWarm(pricefetch.NewPgWarm(pool))
-	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares)
+	dataH := handler.NewDataHandler(routeFW, poiSrc, kbStore, kv, conv, geo, placesClient, fares, aiPrimary)
 
 	// Attach the planner + flywheel as LLM tools to the chat orchestrator.
 	aiH := handler.NewAIHandler(aiPrimary, aiBulk,

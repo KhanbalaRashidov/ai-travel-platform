@@ -49,7 +49,7 @@ func dataApp(t *testing.T) *fiber.App {
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 	})
 	fares := pricefetch.NewResolver(nil, nil, conv, kv, 0) // disabled -> estimate fallback
-	h := NewDataHandler(fw, poi, store, kv, conv, geo, places.New(placesDoer), fares)
+	h := NewDataHandler(fw, poi, store, kv, conv, geo, places.New(placesDoer), fares, nil)
 
 	app := fiber.New()
 	app.Use(tenant.Middleware("t1"))

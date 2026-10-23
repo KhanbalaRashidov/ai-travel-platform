@@ -26,6 +26,7 @@ import Link from "next/link";
 interface Pending {
   places: Place[];
   origin: Place | null;
+  budget: number;
   start: string;
   mode: ModePref;
   tier: Tier;
@@ -83,6 +84,7 @@ export default function PlanPage() {
   // No hardcoded cities: the user searches and adds places (with coordinates).
   const [places, setPlaces] = useState<Place[]>([]);
   const [origin, setOrigin] = useState<Place | null>(null); // departure (no hotel)
+  const [budget, setBudget] = useState(0); // EUR; enables minimal mode (AI suggests)
   const [start, setStart] = useState("");
   const [startDate, setStartDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
@@ -129,7 +131,7 @@ export default function PlanPage() {
       if (typeof d.inf === "number") setInfants(d.inf);
       if (pl.length >= 2) {
         setPending({
-          places: pl, origin: null, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
+          places: pl, origin: null, budget: 0, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
           nights: 2, currency: d.cu ?? "EUR", order: undefined, legModes: {},
           startDate: d.d ?? "", returnDate: d.r ?? "",
           adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0,
@@ -158,8 +160,13 @@ export default function PlanPage() {
     }
   }
 
+  // Enough to plan: 2+ destinations, or an origin with 1+ destination, or an
+  // origin + budget (minimal mode — AI suggests destinations).
+  const enoughToPlan = (ps: Place[], o: Place | null, b: number) =>
+    ps.length >= 2 || (!!o && (ps.length >= 1 || b > 0));
+
   async function fetchPlan(p: Pending) {
-    if (p.places.length < (p.origin ? 1 : 2)) {
+    if (!enoughToPlan(p.places, p.origin, p.budget)) {
       setError(t("err.minCities"));
       return;
     }
@@ -177,6 +184,7 @@ export default function PlanPage() {
         cities: names,
         places: coords,
         origin: p.origin?.name,
+        budget_eur: p.budget || undefined,
         start: startName,
         mode: p.mode,
         tier: p.tier,
@@ -230,6 +238,7 @@ export default function PlanPage() {
     return {
       places,
       origin,
+      budget,
       start,
       mode: pref,
       tier,
@@ -254,7 +263,7 @@ export default function PlanPage() {
   }
 
   function onPlan() {
-    if (places.length < (origin ? 1 : 2)) {
+    if (!enoughToPlan(places, origin, budget)) {
       setError(t("err.minCities"));
       return;
     }
@@ -316,6 +325,7 @@ export default function PlanPage() {
       setPending({
         places: newPlaces,
         origin,
+        budget,
         start: newStart,
         mode: newPref,
         tier: newTier,
@@ -445,6 +455,17 @@ export default function PlanPage() {
             )}
           </Field>
 
+          <div className="mt-4">
+            <Field label={t("plan.budget")}>
+              <NumberInput
+                type="number"
+                min={0}
+                value={budget || ""}
+                onChange={(e) => setBudget(Math.max(0, Number(e.target.value)))}
+              />
+            </Field>
+          </div>
+
           <div className="mt-4" />
           <Field label={t("plan.cities")}>
             <CityAutocomplete
@@ -531,7 +552,7 @@ export default function PlanPage() {
           </div>
 
           <div className="mt-6">
-            <Button onClick={onPlan} disabled={loading || places.length < (origin ? 1 : 2)}>
+            <Button onClick={onPlan} disabled={loading || !enoughToPlan(places, origin, budget)}>
               {loading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-fg/40 border-t-primary-fg" />
