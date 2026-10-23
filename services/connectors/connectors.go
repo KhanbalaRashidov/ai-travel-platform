@@ -1,12 +1,8 @@
-// Package connectors will fetch external travel data (flights, ground transport,
-// hotels, POIs, FX) from open/free sources with a scrape fallback, normalizing
-// everything with source + fetched_at. Not dependent on gated APIs.
+// Package connectors fetches external travel data (flights, ground transport,
+// hotels, POIs, FX) from open/free sources with a scrape/estimate fallback,
+// normalizing everything with provenance (source + fetched_at). It never
+// depends on a single gated API: each capability is a fallback chain of
+// sources, and a last-resort labeled estimate keeps the system responsive.
 //
-// Split-ready: implemented in E2.
+// Split-ready: this package can later become its own service (E2).
 package connectors
-
-// Source is the common interface every data connector will implement (E2).
-type Source interface {
-	// Name returns the connector's identifier.
-	Name() string
-}
