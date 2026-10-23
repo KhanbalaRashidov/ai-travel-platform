@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -255,35 +254,11 @@ func (g *GeminiLLM) complete(ctx context.Context, msgs []Message, tools []ToolSp
 }
 
 // attempt performs one logical call to a model, retrying only on transient
-// (429/503) errors with exponential backoff + jitter. 4xx and parse errors
-// return immediately. It stops early if the context is cancelled.
+// (429/503) errors with exponential backoff + jitter.
 func (g *GeminiLLM) attempt(ctx context.Context, model string, payload []byte) (Completion, error) {
-	var lastErr error
-	for i := 0; i <= len(g.delays); i++ {
-		if i > 0 {
-			if err := g.wait(ctx, g.delays[i-1]); err != nil {
-				return Completion{}, err
-			}
-		}
-		comp, err := g.doOnce(ctx, model, payload)
-		if err == nil {
-			return comp, nil
-		}
-		lastErr = err
-		if !IsTransient(err) {
-			return Completion{}, err // 4xx / parse -> no retry
-		}
-	}
-	return Completion{}, lastErr // exhausted retries; lastErr is a transient *APIError
-}
-
-// wait sleeps for d plus up to 25% jitter, aborting if the context is cancelled.
-func (g *GeminiLLM) wait(ctx context.Context, d time.Duration) error {
-	if d > 0 {
-		jitter := time.Duration(rand.Int63n(int64(d)/4 + 1))
-		g.sleep(d + jitter)
-	}
-	return ctx.Err()
+	return retryTransient(ctx, g.delays, g.sleep, func() (Completion, error) {
+		return g.doOnce(ctx, model, payload)
+	})
 }
 
 // doOnce performs a single HTTP call + parse, metering on success.

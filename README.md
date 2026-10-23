@@ -28,16 +28,16 @@ cd web && npm install && npm run dev
 
 Health: `GET http://localhost:8080/health` · Readiness (db+redis): `GET /ready`
 
-### AI (Gemini by default, free — or Claude)
-Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else. Default provider is **Gemini** (free):
+### AI (Groq by default, free — or Gemini / Claude)
+Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else. Default provider is **Groq** (free, OpenAI-compatible):
 ```bash
-echo 'GEMINI_API_KEY=...' >> .env                # LLM_PROVIDER=gemini is the default
+echo 'GROQ_API_KEY=...' >> .env                  # LLM_PROVIDER=groq is the default
 docker compose -f deploy/docker-compose.yml up -d
 ```
-To use Claude instead, set `LLM_PROVIDER=claude` and `ANTHROPIC_API_KEY=...` in `.env`. The api service loads the repo-root `.env` via `env_file` (no `--env-file`, no `${...}` interpolation warnings). Verify:
+To switch provider, set `LLM_PROVIDER` to `gemini` (+ `GEMINI_API_KEY`) or `claude` (+ `ANTHROPIC_API_KEY`) in `.env`. The api service loads the repo-root `.env` via `env_file` (no `--env-file`, no `${...}` interpolation warnings). Verify:
 ```bash
-docker compose -f deploy/docker-compose.yml logs api | grep -i AI             # -> "AI enabled: provider=gemini model=..."
-docker compose -f deploy/docker-compose.yml exec api printenv | grep -E 'GEMINI|LLM_PROVIDER'
+docker compose -f deploy/docker-compose.yml logs api | grep -i AI             # -> "AI enabled: provider=groq model=..."
+docker compose -f deploy/docker-compose.yml exec api printenv | grep -E 'GROQ|GEMINI|LLM_PROVIDER'
 ```
 Without the selected provider's key the stack still runs; the AI endpoints return 503 ("AI not configured"). Explicit `environment:` values (DATABASE_URL/REDIS_URL/JWT_*) override anything in `.env`, so the container keeps its service-DNS URLs.
 

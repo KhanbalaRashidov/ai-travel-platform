@@ -24,6 +24,8 @@ type Config struct {
 	// When the selected provider's key is empty, the AI endpoints report "not
 	// configured" and the rest of the platform runs normally.
 	LLMProvider         string
+	GroqAPIKey          string
+	GroqModel           string
 	GeminiAPIKey        string
 	GeminiModel         string
 	GeminiFallbackModel string
@@ -44,7 +46,9 @@ func Load() Config {
 		JWTSecret:   getenv("JWT_SECRET", "dev-insecure-change-me"),
 		JWTTTL:      time.Duration(getenvInt("JWT_TTL_HOURS", 72)) * time.Hour,
 
-		LLMProvider:         getenv("LLM_PROVIDER", "gemini"),
+		LLMProvider:         getenv("LLM_PROVIDER", "groq"),
+		GroqAPIKey:          os.Getenv("GROQ_API_KEY"),
+		GroqModel:           getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
 		GeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:         getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 		GeminiFallbackModel: os.Getenv("GEMINI_FALLBACK_MODEL"),

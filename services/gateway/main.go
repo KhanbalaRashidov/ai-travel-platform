@@ -77,7 +77,7 @@ func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
 		bulk := ai.NewClaude(cfg.AnthropicAPIKey, ai.ModelBulk, nil).WithBudget(budget).WithMeter(meter)
 		log.Printf("AI enabled: provider=claude primary=%s bulk=%s budget=$%.2f", ai.ModelPrimary.Name, ai.ModelBulk.Name, cfg.AIBudgetUSD)
 		return primary, bulk
-	default: // gemini (free)
+	case "gemini":
 		if cfg.GeminiAPIKey == "" {
 			log.Printf("AI disabled: provider=gemini but GEMINI_API_KEY not set (AI endpoints will return 503)")
 			return nil, nil
@@ -85,6 +85,14 @@ func buildLLMs(cfg config.Config) (ai.LLM, ai.LLM) {
 		llm := ai.NewGemini(cfg.GeminiAPIKey, cfg.GeminiModel, nil).
 			WithBudget(budget).WithMeter(meter).WithFallback(cfg.GeminiFallbackModel)
 		log.Printf("AI enabled: provider=gemini model=%s fallback=%q (free)", llm.Model(), cfg.GeminiFallbackModel)
+		return llm, llm
+	default: // groq (free)
+		if cfg.GroqAPIKey == "" {
+			log.Printf("AI disabled: provider=groq but GROQ_API_KEY not set (AI endpoints will return 503)")
+			return nil, nil
+		}
+		llm := ai.NewGroq(cfg.GroqAPIKey, cfg.GroqModel, nil).WithBudget(budget).WithMeter(meter)
+		log.Printf("AI enabled: provider=groq model=%s (free)", llm.Model())
 		return llm, llm // one free model serves both reasoning and bulk
 	}
 }
