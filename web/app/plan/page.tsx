@@ -18,6 +18,7 @@ import {
 import {
   Breakdown,
   destinations,
+  ItineraryBrief,
   PricedHotel,
   PricedLeg,
   price,
@@ -30,6 +31,7 @@ import { Badge, Button, Card, Chip, Field, NumberInput, Select } from "../../com
 import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
 import { CostDonut, CostSegment } from "../../components/CostDonut";
 import { RouteMap, MapPoint } from "../../components/RouteMap";
+import { AIPanel } from "../../components/AIPanel";
 import { PinIcon, RouteIcon, WalletIcon } from "../../components/icons";
 import Link from "next/link";
 
@@ -205,6 +207,28 @@ export default function PlanPage() {
       })
     : [];
 
+  // Grounded brief for the AI itinerary writer. Leg prices (held in EUR) are
+  // converted to the display currency so every number matches what the user
+  // sees and the price guardrail stays consistent.
+  const aiBrief: ItineraryBrief | null =
+    planned && breakdown
+      ? {
+          cities: stops,
+          legs: legs.map((l, i) => ({
+            from: stops[i],
+            to: stops[i + 1],
+            mode: l.mode,
+            price: Number((l.price / (RATES[currency] ?? 1)).toFixed(2)),
+          })),
+          nights,
+          currency: breakdown.currency,
+          transport_total: breakdown.transport,
+          hotels_total: breakdown.hotels,
+          activities_total: breakdown.activities,
+          total: breakdown.total,
+        }
+      : null;
+
   const segments: CostSegment[] = breakdown
     ? [
         { key: "transport", label: t("res.transport"), value: breakdown.transport, colorVar: "--transport" },
@@ -368,6 +392,9 @@ export default function PlanPage() {
               </div>
               <RouteMap points={mapPoints} closed={planned.route.variant === "round_trip"} />
             </Card>
+
+            {/* AI: itinerary writer + chat */}
+            <AIPanel brief={aiBrief} />
           </section>
         )}
       </main>

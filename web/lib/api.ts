@@ -52,26 +52,42 @@ interface Envelope<T> {
   error?: string;
 }
 
+// ApiError carries the HTTP status so callers can distinguish cases such as 503
+// (e.g. AI not configured) from a generic failure.
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function parseEnvelope<T>(res: Response): Promise<T> {
+  let json: Envelope<T> | null = null;
+  try {
+    json = (await res.json()) as Envelope<T>;
+  } catch {
+    /* non-JSON body */
+  }
+  if (!res.ok || !json || json.success === false) {
+    throw new ApiError(res.status, json?.error ?? `request failed (${res.status})`);
+  }
+  return json.data as T;
+}
+
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = (await res.json()) as Envelope<T>;
-  if (!res.ok || json.success === false) {
-    throw new Error(json.error ?? `request failed (${res.status})`);
-  }
-  return json.data as T;
+  return parseEnvelope<T>(res);
 }
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
-  const json = (await res.json()) as Envelope<T>;
-  if (!res.ok || json.success === false) {
-    throw new Error(json.error ?? `request failed (${res.status})`);
-  }
-  return json.data as T;
+  return parseEnvelope<T>(res);
 }
 
 // Destination from the dynamic, knowledge-backed city list (GET /data/destinations).
@@ -85,6 +101,39 @@ export interface DestinationDTO {
 
 export function destinations(): Promise<DestinationDTO[]> {
   return getJSON("/data/destinations");
+}
+
+// --- AI (Claude) -----------------------------------------------------------
+
+export interface Violation {
+  value: number;
+}
+
+// AIResult mirrors the backend ai.Result envelope.
+export interface AIResult {
+  text: string;
+  grounding?: number[];
+  violations?: Violation[];
+  steps?: number;
+}
+
+export interface ItineraryBrief {
+  cities: string[];
+  legs: { from: string; to: string; mode: string; price: number }[];
+  nights: number;
+  currency: string;
+  transport_total: number;
+  hotels_total: number;
+  activities_total: number;
+  total: number;
+}
+
+export function itinerary(brief: ItineraryBrief): Promise<AIResult> {
+  return postJSON("/ai/itinerary", brief);
+}
+
+export function chat(message: string): Promise<AIResult> {
+  return postJSON("/ai/chat", { message });
 }
 
 export function sequence(
