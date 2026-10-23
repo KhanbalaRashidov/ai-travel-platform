@@ -1,0 +1,20 @@
+# Keep the Docker build context small and secret-free (build context = repo root).
+.git
+.github
+bin/
+*.log
+
+# node / next (web deps are installed inside the image)
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+
+# secrets must never enter an image build context
+.env
+.env.local
+keys/
+*.pem
+
+# docs / local
+LEARNING_PROGRESS.md
