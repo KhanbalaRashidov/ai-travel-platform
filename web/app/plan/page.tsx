@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CURRENCIES, ModePref, Tier } from "../../lib/sample";
 import {
   EditState,
@@ -166,11 +166,16 @@ export default function PlanPage() {
   const enoughToPlan = (ps: Place[], o: Place | null, b: number) =>
     ps.length >= 2 || (!!o && (ps.length >= 1 || b > 0));
 
+  // Monotonic request id: a superseded (stale) plan response is ignored so the
+  // latest toggle always wins, with no wasted re-render (§6).
+  const planSeq = useRef(0);
+
   async function fetchPlan(p: Pending) {
     if (!enoughToPlan(p.places, p.origin, p.budget)) {
       setError(t("err.minCities"));
       return;
     }
+    const seq = ++planSeq.current;
     const names = p.places.map((x) => x.name);
     const startName = names.includes(p.start) ? p.start : names[0];
     // Origin (if any) ships its coords in `places` so the backend can geolocate it.
@@ -200,14 +205,16 @@ export default function PlanPage() {
         children: p.children,
         infants: p.infants,
       });
+      if (seq !== planSeq.current) return; // a newer request superseded this one
       setPlan(q);
       track("plan_computed");
       toast(p.order ? t("toast.updated") : t("toast.ready"), "success");
     } catch {
+      if (seq !== planSeq.current) return;
       setError(t("err.sequence"));
       toast(t("err.sequence"), "error");
     } finally {
-      setLoading(false);
+      if (seq === planSeq.current) setLoading(false);
     }
   }
 
@@ -644,7 +651,15 @@ export default function PlanPage() {
                   </span>
                 )}
               </div>
-              <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
+              <div className="flex items-center gap-2">
+                {loading && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-muted">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted/40 border-t-muted" />
+                    {t("res.updating")}
+                  </span>
+                )}
+                <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
+              </div>
             </Card>
 
             <div className="flex flex-wrap justify-end gap-2 print:hidden">

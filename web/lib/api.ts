@@ -111,6 +111,46 @@ async function getJSON<T>(path: string): Promise<T> {
   return parseEnvelope<T>(res);
 }
 
+// --- client-side response cache (§6: aggressive cache, no re-fetch) ----------
+// A small signature-keyed cache that also de-duplicates in-flight requests, so
+// toggling back to an already-computed plan / roadmap / POI set is instant and
+// never re-hits the network. TTL-bounded and size-capped; results stay fresh
+// enough (server fares are cached ~6h) while a session's toggles feel instant.
+
+interface CacheEntry<T> {
+  at: number;
+  value?: T;
+  promise?: Promise<T>;
+}
+
+const CACHE_TTL_MS = 5 * 60_000;
+const CACHE_MAX = 60;
+const responseCache = new Map<string, CacheEntry<unknown>>();
+
+function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const hit = responseCache.get(key) as CacheEntry<T> | undefined;
+  if (hit) {
+    if (hit.value !== undefined && now - hit.at < CACHE_TTL_MS) return Promise.resolve(hit.value);
+    if (hit.promise) return hit.promise; // in-flight de-dupe
+  }
+  const promise = fn()
+    .then((v) => {
+      responseCache.set(key, { at: Date.now(), value: v });
+      if (responseCache.size > CACHE_MAX) {
+        const oldest = responseCache.keys().next().value;
+        if (oldest !== undefined) responseCache.delete(oldest);
+      }
+      return v;
+    })
+    .catch((e) => {
+      responseCache.delete(key); // never cache failures
+      throw e;
+    });
+  responseCache.set(key, { at: now, promise });
+  return promise;
+}
+
 // Destination from the dynamic, knowledge-backed city list (GET /data/destinations).
 export interface DestinationDTO {
   country: string;
@@ -153,7 +193,9 @@ export interface POIItem {
 }
 
 export function fetchPOIs(city: string, limit = 8): Promise<POIItem[]> {
-  return getJSON(`/data/poi?city=${encodeURIComponent(city)}&limit=${limit}`);
+  return cached(`poi:${city.toLowerCase()}:${limit}`, () =>
+    getJSON(`/data/poi?city=${encodeURIComponent(city)}&limit=${limit}`)
+  );
 }
 
 // track records a privacy-safe aggregate event (fire-and-forget, never throws).
@@ -252,7 +294,7 @@ export interface PlanQuoteReq {
 }
 
 export function planQuote(req: PlanQuoteReq): Promise<PlanQuote> {
-  return postJSON("/data/plan", req);
+  return cached("plan:" + JSON.stringify(req), () => postJSON("/data/plan", req));
 }
 
 // --- AI (Claude) -----------------------------------------------------------
@@ -329,7 +371,8 @@ export function roadmap(
   places: { name: string; lat: number; lng: number }[],
   locale = "en"
 ): Promise<Roadmap> {
-  return postJSON("/ai/roadmap", { cities, nights_by_city, places, locale });
+  const body = { cities, nights_by_city, places, locale };
+  return cached("roadmap:" + JSON.stringify(body), () => postJSON("/ai/roadmap", body));
 }
 
 // Conversational refine: the backend LLM parses the edit, applies it

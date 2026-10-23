@@ -87,7 +87,9 @@ func (h *DataHandler) Plan(c *fiber.Ctx) error {
 	fw := dataflow.NewRouteFlywheel(h.kv, h.store, est, 0)
 	pricing := dataflow.NewPricePlanner(fw, est, geo, h.conv)
 	if h.fares != nil {
-		pricing = pricing.WithFares(h.fares)
+		// Cap the real (cold) fetch per leg so a plan always returns promptly;
+		// cache hits are instant, a slow source falls back to the estimate (§6).
+		pricing = pricing.WithFares(h.fares).WithFareDeadline(4 * time.Second)
 	}
 
 	res, err := pricing.Plan(c.Context(), tenant.FromContext(c), req)

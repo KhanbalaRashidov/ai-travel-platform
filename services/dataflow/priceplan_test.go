@@ -3,11 +3,13 @@ package dataflow
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/cache"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/connectors/estimate"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/knowledge"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/planner"
+	"github.com/KhanbalaRashidov/ai-travel-platform/services/pricefetch"
 )
 
 func newTestPlanner() *PricePlanner {
@@ -200,4 +202,44 @@ func TestPlan_CurrencyConversion(t *testing.T) {
 func withCurrency(r PlanRequest, cur string) PlanRequest {
 	r.Currency = cur
 	return r
+}
+
+// blockingFares is a FareResolver whose Quote never returns a result until the
+// context is cancelled — simulating a slow cold fetch.
+type blockingFares struct{ called chan struct{} }
+
+func (b *blockingFares) Enabled() bool { return true }
+func (b *blockingFares) Quote(ctx context.Context, _ pricefetch.LegQuery, _, _ string) (pricefetch.Candidate, []pricefetch.Candidate, bool) {
+	select {
+	case b.called <- struct{}{}:
+	default:
+	}
+	<-ctx.Done() // block until the per-leg deadline fires
+	return pricefetch.Candidate{}, nil, false
+}
+
+func TestPlan_FareDeadlineFallsBackToEstimate(t *testing.T) {
+	p := newTestPlanner().WithFares(&blockingFares{called: make(chan struct{}, 4)}).
+		WithFareDeadline(60 * time.Millisecond)
+
+	start := time.Now()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Tbilisi"}, Start: "Baku",
+		Mode: "flight", Tier: "standard", Nights: 1, Currency: "EUR",
+	})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	// The slow fare source is bounded, so the plan still returns using the
+	// labeled estimate — and promptly (one leg ~ one deadline, not forever).
+	if !res.Estimated || len(res.Legs) == 0 || !res.Legs[0].Estimated {
+		t.Fatalf("expected estimate fallback, got %+v", res)
+	}
+	if res.Total <= 0 {
+		t.Fatalf("plan should still be priced: %+v", res)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("deadline did not bound the fetch: took %s", elapsed)
+	}
 }

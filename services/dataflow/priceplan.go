@@ -165,9 +165,10 @@ type PricePlanner struct {
 	geo    conn.Geocoder
 	conv   planner.Converter
 
-	fares      FareResolver // optional real-price source
-	tripDate   string       // per-call context for the fare resolver
-	tripAdults int
+	fares        FareResolver  // optional real-price source
+	fareDeadline time.Duration // per-leg cold-fetch budget (0 = unbounded)
+	tripDate     string        // per-call context for the fare resolver
+	tripAdults   int
 }
 
 // NewPricePlanner wires the priced planner.
@@ -177,6 +178,14 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 
 // WithFares attaches a real multi-source fare resolver (preferred over estimate).
 func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// WithFareDeadline caps how long a single leg may spend on the real (cold) fetch
+// before falling back to the labeled estimate, so a plan always returns promptly
+// (§6 progressive). Cache hits are unaffected; <=0 means unbounded.
+func (p *PricePlanner) WithFareDeadline(d time.Duration) *PricePlanner {
+	p.fareDeadline = d
+	return p
+}
 
 // legQuote builds a LegQuote with a REAL deep-link (the source's own page when
 // fetched, else a route-prefilled Rome2Rio link — never a generic search) and
@@ -267,6 +276,11 @@ func (p *PricePlanner) realLeg(ctx context.Context, tenantID, from, to, mode str
 		From: from, To: to,
 		FromLat: fc.Lat, FromLng: fc.Lng, ToLat: tc.Lat, ToLng: tc.Lng,
 		Mode: resolveMode(mode), DepartDate: p.tripDate, Adults: p.tripAdults,
+	}
+	if p.fareDeadline > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.fareDeadline)
+		defer cancel()
 	}
 	cand, chain, ok := p.fares.Quote(ctx, q, "EUR", tenantID)
 	if !ok {
