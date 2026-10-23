@@ -8,6 +8,13 @@ export interface TimelineLeg {
   price: string; // formatted price + currency
   href?: string; // optional info/search deep-link
   hrefLabel?: string; // localized label for the link
+  modeValue?: string; // current override selection (for the per-leg selector)
+  onModeChange?: (mode: string) => void;
+}
+
+export interface ModeOption {
+  value: string;
+  label: string;
 }
 
 // Vertical, visual route: numbered stops connected by transport legs that carry
@@ -17,11 +24,13 @@ export function RouteTimeline({
   legs = [],
   nights = [],
   nightLabel,
+  modeOptions,
 }: {
   stops?: string[];
   legs?: TimelineLeg[];
   nights?: number[];
   nightLabel?: (n: number) => string;
+  modeOptions?: ModeOption[];
 }) {
   return (
     <ol className="relative">
@@ -63,6 +72,21 @@ export function RouteTimeline({
                     >
                       {legs[i].hrefLabel ?? "search"} ↗
                     </a>
+                  </>
+                )}
+                {legs[i].onModeChange && modeOptions && (
+                  <>
+                    <span className="text-border">·</span>
+                    <select
+                      value={legs[i].modeValue ?? legs[i].mode}
+                      onChange={(e) => legs[i].onModeChange?.(e.target.value)}
+                      aria-label="change transport mode"
+                      className="rounded-md border border-border bg-surface px-1.5 py-0.5 text-xs text-muted outline-none hover:border-primary/40 focus:border-primary print:hidden"
+                    >
+                      {modeOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
                   </>
                 )}
               </div>

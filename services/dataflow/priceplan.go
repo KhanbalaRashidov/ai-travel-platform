@@ -70,6 +70,10 @@ type PlanRequest struct {
 	Currency string       `json:"currency"`
 	Order    []string     `json:"order"`
 	Variant  string       `json:"variant"`
+	// LegModes overrides the transport mode for specific legs, keyed by
+	// "from|to" (used by the per-leg alternatives selector). Pricing-only — it
+	// never changes the sequence.
+	LegModes map[string]string `json:"leg_modes"`
 
 	StartDate  string `json:"start_date"`
 	ReturnDate string `json:"return_date"`
@@ -136,6 +140,11 @@ func NewPricePlanner(routes *RouteFlywheel, hotels HotelResolver, geo conn.Geoco
 
 // WithFares attaches a real multi-source fare resolver (preferred over estimate).
 func (p *PricePlanner) WithFares(f FareResolver) *PricePlanner { p.fares = f; return p }
+
+// isValidLegMode reports whether m is an accepted per-leg override.
+func isValidLegMode(m string) bool {
+	return m == "cheapest" || m == "flight" || m == "train" || m == "bus"
+}
 
 // resolveMode maps "cheapest"/"" to a concrete mode for a fare lookup.
 func resolveMode(mode string) conn.TransportMode {
@@ -282,7 +291,13 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	priced := make([]planner.PricedLeg, 0, len(order))
 	anyEstimated := false
 	for i := 0; i+1 < len(order); i++ {
-		q, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], req.Mode)
+		// A per-leg override (from the alternatives selector) wins over the
+		// global mode; it only affects pricing, never the sequence.
+		legMode := req.Mode
+		if m, ok := req.LegModes[order[i]+"|"+order[i+1]]; ok && isValidLegMode(m) {
+			legMode = m
+		}
+		q, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], legMode)
 		if !ok {
 			return PlanResult{}, ErrLegUnavailable
 		}

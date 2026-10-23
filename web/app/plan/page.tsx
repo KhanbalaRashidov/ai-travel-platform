@@ -29,6 +29,7 @@ interface Pending {
   nights: number;
   currency: string;
   order?: string[];
+  legModes: Record<string, string>;
   startDate: string;
   returnDate: string;
   adults: number;
@@ -93,6 +94,7 @@ export default function PlanPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [copied, setCopied] = useState(false);
+  const [legModes, setLegModes] = useState<Record<string, string>>({});
 
   // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
   useEffect(() => {
@@ -123,7 +125,8 @@ export default function PlanPage() {
       if (pl.length >= 2) {
         setPending({
           places: pl, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
-          nights: 2, currency: d.cu ?? "EUR", startDate: d.d ?? "", returnDate: d.r ?? "",
+          nights: 2, currency: d.cu ?? "EUR", order: undefined, legModes: {},
+          startDate: d.d ?? "", returnDate: d.r ?? "",
           adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0,
         });
       }
@@ -170,6 +173,7 @@ export default function PlanPage() {
         currency: p.currency,
         order: p.order,
         variant: p.order ? plan?.variant : undefined,
+        leg_modes: p.legModes,
         start_date: p.startDate || undefined,
         return_date: p.returnDate || undefined,
         adults: p.adults,
@@ -198,12 +202,14 @@ export default function PlanPage() {
     const next = [...places, p];
     setPlaces(next);
     if (!start) setStart(p.name);
+    setLegModes({});
     setPlan(null); // city-set change -> recompute manually
   }
   function removePlace(name: string) {
     const next = places.filter((x) => x.name !== name);
     setPlaces(next);
     if (start === name) setStart(next[0]?.name ?? "");
+    setLegModes({});
     setPlan(null);
   }
 
@@ -216,12 +222,21 @@ export default function PlanPage() {
       nights,
       currency,
       order,
+      legModes,
       startDate,
       returnDate,
       adults,
       children,
       infants,
     };
+  }
+
+  // Per-leg alternatives selector: override one leg's mode and re-price the same
+  // order (no re-sequence).
+  function changeLegMode(from: string, to: string, mode: string) {
+    const next = { ...legModes, [`${from}|${to}`]: mode };
+    setLegModes(next);
+    if (plan) setPending({ ...base(plan.order), legModes: next });
   }
 
   function onPlan() {
@@ -267,6 +282,7 @@ export default function PlanPage() {
     setNights(newNights);
     if (newPlaces.length >= 2) {
       const resequence = !sameNames(newPlaces, places);
+      if (resequence) setLegModes({});
       setPending({
         places: newPlaces,
         start: newStart,
@@ -275,6 +291,7 @@ export default function PlanPage() {
         nights: newNights,
         currency,
         order: resequence ? undefined : plan?.order,
+        legModes: resequence ? {} : legModes,
         startDate,
         returnDate,
         adults,
@@ -301,8 +318,17 @@ export default function PlanPage() {
         // Plain informational search link (no booking, no affiliate).
         href: `https://www.google.com/search?q=${encodeURIComponent(`${l.from} to ${l.to} ${l.mode}`)}`,
         hrefLabel: t("res.searchInfo"),
+        modeValue: legModes[`${l.from}|${l.to}`] ?? l.mode,
+        onModeChange: (m: string) => changeLegMode(l.from, l.to, m),
       }))
     : [];
+
+  const modeOptions = [
+    { value: "cheapest", label: t("mode.cheapest") },
+    { value: "flight", label: t("mode.flight") },
+    { value: "train", label: t("mode.train") },
+    { value: "bus", label: t("mode.bus") },
+  ];
 
   const mapPoints: MapPoint[] = plan
     ? (plan.order ?? [])
@@ -497,6 +523,7 @@ export default function PlanPage() {
                     legs={timelineLegs}
                     nights={plan.nights_by_city ?? []}
                     nightLabel={(n) => t("res.nights", { n })}
+                    modeOptions={modeOptions}
                   />
                 </div>
                 {plan.alt_variant && (

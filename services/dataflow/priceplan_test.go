@@ -93,6 +93,22 @@ func TestPlan_OrderGivenSkipsResequence(t *testing.T) {
 	}
 }
 
+func TestPlan_PerLegModeOverride(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Baku", "Tbilisi"}, Start: "Baku",
+		Mode: "flight", Tier: "standard", Nights: 1, Currency: "EUR",
+		Order:    []string{"Baku", "Tbilisi"},
+		LegModes: map[string]string{"Baku|Tbilisi": "bus"},
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if len(res.Legs) != 1 || res.Legs[0].Mode != "bus" {
+		t.Fatalf("per-leg override should force bus, got %+v", res.Legs)
+	}
+}
+
 func TestPlan_CurrencyConversion(t *testing.T) {
 	p := newTestPlanner()
 	req := PlanRequest{Cities: []string{"Baku", "Tbilisi"}, Start: "Baku", Mode: "flight", Tier: "standard", Nights: 1}

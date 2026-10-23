@@ -192,6 +192,7 @@ export interface PlanQuoteReq {
   currency: string;
   order?: string[]; // supplied => re-price that order without re-sequencing
   variant?: string;
+  leg_modes?: Record<string, string>; // per-leg mode override ("from|to" -> mode)
   start_date?: string;
   return_date?: string;
   adults?: number;
