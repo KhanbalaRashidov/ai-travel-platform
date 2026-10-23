@@ -28,6 +28,19 @@ cd web && npm install && npm run dev
 
 Health: `GET http://localhost:8080/health` · Readiness (db+redis): `GET /ready`
 
+### AI (Claude)
+Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else:
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env     # optional: AI_BUDGET_USD=100
+docker compose -f deploy/docker-compose.yml up -d
+```
+The api service loads the repo-root `.env` via `env_file` (no `--env-file`, no `${...}` interpolation warnings). Verify:
+```bash
+docker compose -f deploy/docker-compose.yml logs api | grep -i AI            # -> "AI enabled: ..."
+docker compose -f deploy/docker-compose.yml exec api printenv | grep ANTHROPIC  # -> key present
+```
+Without the key the stack still runs; the AI endpoints return 503 ("AI not configured"). Explicit `environment:` values (DATABASE_URL/REDIS_URL/JWT_*) override anything in `.env`, so the container keeps its service-DNS URLs.
+
 ## Monorepo layout
 ```
 services/   Go app (gateway = HTTP entry; planner/connectors/knowledge/ai = split-ready domains)

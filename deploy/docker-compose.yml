@@ -26,6 +26,14 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+    # Load the repo-root .env directly into the container (path is relative to
+    # this compose file: deploy/ -> ../.env). required: false means a missing
+    # .env is not an error. This carries secrets like ANTHROPIC_API_KEY without
+    # ${...} interpolation (which would warn), so `docker compose up -d` works
+    # on its own — no --env-file needed.
+    env_file:
+      - path: ../.env
+        required: false
     environment:
       API_PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/ai_travel?sslmode=disable
