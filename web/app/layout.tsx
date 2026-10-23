@@ -16,10 +16,21 @@ const sora = Sora({
   display: "swap",
 });
 
+const siteURL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteURL),
   title: "AI Travel Platform — cost-optimal trip roadmaps",
   description:
     "Cost-optimal multi-country trip roadmaps: cheapest route, hotels by tier, day-by-day plan and a live total. Advisory only.",
+  openGraph: {
+    title: "AI Travel Platform — cost-optimal trip roadmaps",
+    description:
+      "Find the cheapest multi-country route, hotels by tier, a day-by-day plan and a live total. Advisory only — no booking.",
+    type: "website",
+    url: siteURL,
+  },
+  twitter: { card: "summary_large_image", title: "AI Travel Platform" },
 };
 
 // Set the theme class before paint so there is no light/dark flash.
