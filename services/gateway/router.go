@@ -73,6 +73,7 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 		NewSequenceTool(estimator),
 		NewQuoteTool(routeFW, defaultTenantID),
 	)
+	analyticsH := handler.NewAnalyticsHandler()
 
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/register", authH.Register)
@@ -102,6 +103,10 @@ func buildApp(pool *pgxpool.Pool, rdb *redis.Client, jwtMgr *auth.JWTManager, de
 	v1.Post("/ai/itinerary", aiH.Itinerary)
 	v1.Post("/ai/chat", aiH.Chat)
 	v1.Post("/ai/refine", aiH.Refine)
+
+	// Privacy-safe aggregate usage analytics (allowlisted events only).
+	v1.Post("/analytics/event", analyticsH.Event)
+	v1.Get("/analytics/stats", analyticsH.Stats)
 
 	return app
 }

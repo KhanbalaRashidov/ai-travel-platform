@@ -8,6 +8,7 @@ import {
   Place,
   planQuote,
   PlanQuote,
+  track,
 } from "../../lib/api";
 import { LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
 import { AppShell } from "../../components/AppShell";
@@ -119,6 +120,7 @@ export default function PlanPage() {
         infants: p.infants,
       });
       setPlan(q);
+      track("plan_computed");
     } catch {
       setError(t("err.sequence"));
     } finally {

@@ -37,7 +37,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <div className="relative">{children}</div>
       <footer className="mx-auto max-w-5xl px-4 py-10 text-center text-xs text-muted">
-        AI Travel Platform · advisory only — no booking, no payment.
+        AI Travel Platform · advisory only — no booking, no payment · prices are
+        indicative, confirm on the provider&apos;s site · map data © OpenStreetMap.
       </footer>
     </div>
   );

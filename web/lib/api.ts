@@ -138,6 +138,20 @@ export function searchPlaces(q: string): Promise<Place[]> {
   return getJSON(`/data/places?q=${encodeURIComponent(q)}`);
 }
 
+// track records a privacy-safe aggregate event (fire-and-forget, never throws).
+export function track(name: string): void {
+  try {
+    void fetch(`${BASE}/analytics/event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 // --- priced plan (single source of truth: flywheel + estimator + engine) ----
 
 export interface PlanLeg {
