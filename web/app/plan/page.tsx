@@ -114,6 +114,13 @@ export default function PlanPage() {
   const [cityStars, setCityStars] = useState<Record<string, number>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
+  // Local "today" (not UTC) for the date inputs' min — visual validation only:
+  // depart ≥ today, return ≥ depart. The backend still owns real validation.
+  const todayStr = (() => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  })();
+
   // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
   useEffect(() => {
     try {
@@ -749,10 +756,10 @@ export default function PlanPage() {
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label={t("plan.depart")}>
-              <NumberInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <NumberInput type="date" min={todayStr} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </Field>
             <Field label={t("plan.return")}>
-              <NumberInput type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+              <NumberInput type="date" min={startDate || todayStr} value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
             </Field>
             <Field label={t("plan.start")}>
               <Select value={start} onChange={(e) => setStart(e.target.value)}>

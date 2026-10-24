@@ -8,6 +8,9 @@
  * Light is the default; .dark (set on <html>) and prefers-color-scheme flip it.
  */
 :root {
+  /* Make native controls (date-picker text, calendar icon, native scrollbars)
+     follow the active theme so date fields stay legible in dark mode. */
+  color-scheme: light;
   --bg: 247 248 251;
   --surface: 255 255 255;
   --surface-2: 248 250 252;
@@ -32,6 +35,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --bg: 9 11 20;
   --surface: 17 20 33;
   --surface-2: 24 28 44;
@@ -58,6 +62,7 @@
 /* Honor the OS preference when the user has not explicitly chosen a theme. */
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
+    color-scheme: dark;
     --bg: 9 11 20;
     --surface: 17 20 33;
     --surface-2: 24 28 44;
@@ -114,6 +119,27 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background-color: rgb(var(--muted) / 0.55);
+  }
+  /* Native date inputs: legible text in both themes (color-scheme handles the
+     picker), a visible, tappable calendar icon that never clips, and the same
+     metrics as the other controls. The red ring on an out-of-range value
+     (depart < today / return < depart) is the visual validation. */
+  input[type="date"] {
+    color: rgb(var(--text));
+  }
+  input[type="date"]::-webkit-datetime-edit {
+    color: rgb(var(--text));
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s ease;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+  input[type="date"]:invalid {
+    border-color: rgb(var(--danger));
   }
 }
 

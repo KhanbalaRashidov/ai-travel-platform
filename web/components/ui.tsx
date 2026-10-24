@@ -98,7 +98,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 // min-w-0 lets the control shrink to its track — crucial for native date inputs,
 // whose intrinsic min-width otherwise overflows a narrow grid cell.
 const control =
-  "w-full min-w-0 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface";
+  "w-full min-w-0 min-h-[2.75rem] rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface";
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   const { className, ...rest } = props;
