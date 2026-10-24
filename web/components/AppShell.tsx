@@ -5,16 +5,21 @@ import type { ReactNode } from "react";
 import { LanguageSwitcher } from "../lib/i18n";
 import { ThemeToggle } from "./theme";
 
-// Brand mark: a small compass/route glyph in a gradient tile.
+// Brand mark: gradient rounded square + a navigation arrow (matches the promo /
+// og image and favicon). Kept as inline SVG so it reads crisply light & dark.
 function Brand() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-fg shadow-soft">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M14.5 9.5 11 11l-1.5 3.5L13 13z" fill="currentColor" />
-        </svg>
-      </span>
+      <svg width="36" height="36" viewBox="0 0 54 54" className="shadow-soft rounded-[10px]" aria-hidden>
+        <defs>
+          <linearGradient id="brandMark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#8B7CF6" />
+            <stop offset="1" stopColor="#2DD4BF" />
+          </linearGradient>
+        </defs>
+        <rect width="54" height="54" rx="15" fill="url(#brandMark)" />
+        <path d="M27 12 L38 39 L27 32 L16 39 Z" fill="#0A0E24" />
+      </svg>
       <span className="font-display text-base font-bold tracking-tight">
         AI Travel
       </span>
