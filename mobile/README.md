@@ -26,8 +26,8 @@ flutter pub get
 # 3) generate model code (freezed / json_serializable)
 dart run build_runner build --delete-conflicting-outputs
 
-# 4) (optional) brand launcher icon + splash
-#    put a 1024x1024 PNG at assets/icon/app_icon.png (export it from app_icon.svg)
+# 4) brand launcher icon + splash (the 1024x1024 assets/icon/app_icon.png and its
+#    svg source are already in the repo)
 dart run flutter_launcher_icons
 dart run flutter_native_splash:create
 ```
