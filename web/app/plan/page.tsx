@@ -13,7 +13,7 @@ import {
   track,
 } from "../../lib/api";
 import { LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
-import { hotelSites } from "../../lib/links";
+import { hotelSites, skyscannerFlightLink } from "../../lib/links";
 import { AppShell } from "../../components/AppShell";
 import { Badge, Button, Card, Field, NumberInput, Select } from "../../components/ui";
 import { CityAutocomplete } from "../../components/CityAutocomplete";
@@ -452,6 +452,25 @@ export default function PlanPage() {
 
   const coordsByName = (name: string) => places.find((p) => p.name.toLowerCase() === name.toLowerCase());
 
+  const placeByName = (name: string) =>
+    places.find((p) => p.name.toLowerCase() === name.toLowerCase()) ??
+    (origin && origin.name.toLowerCase() === name.toLowerCase() ? origin : undefined);
+
+  // flightHref upgrades a flight leg's link to a prefilled Skyscanner search
+  // (IATA codes) when the backend only has a generic fallback; otherwise keeps
+  // the backend's real/source-specific deep-link (D14).
+  const flightHref = (l: PlanQuote["legs"][number]): string | undefined => {
+    const base = l.url;
+    const generic = !base || /google\.com\/travel|rome2rio\.com/.test(base);
+    if (l.mode === "flight" && generic) {
+      const f = placeByName(l.from);
+      const tp = placeByName(l.to);
+      const sk = skyscannerFlightLink(f?.code, tp?.code, startDate, returnDate, adults, children, infants);
+      if (sk) return sk;
+    }
+    return base;
+  };
+
   const timelineLegs: TimelineLeg[] = plan
     ? (plan.legs ?? []).map((l) => ({
         mode: l.mode,
@@ -460,8 +479,11 @@ export default function PlanPage() {
           l.price > 0
             ? `${l.estimated ? "~" : ""}${fmt(l.price)} ${plan.currency}`
             : t("res.transfer"),
-        // Real, route-prefilled source deep-link (never a generic search).
-        href: l.url,
+        // Real, route-prefilled source deep-link (never a generic search). For
+        // flight legs between airports we upgrade a generic fallback to a
+        // prefilled Skyscanner search using the IATA codes (D14), but keep a
+        // real fetched source page when the backend has one.
+        href: flightHref(l),
         hrefLabel: t("res.searchInfo"),
         modeValue: legModes[`${l.from}|${l.to}`] ?? l.mode,
         onModeChange: (m: string) => changeLegMode(l.from, l.to, m),
@@ -497,9 +519,6 @@ export default function PlanPage() {
     : [];
 
   // Per-stop airport flag (B1): mark a stop whose selected place is an airport.
-  const placeByName = (name: string) =>
-    places.find((p) => p.name.toLowerCase() === name.toLowerCase()) ??
-    (origin && origin.name.toLowerCase() === name.toLowerCase() ? origin : undefined);
   const stopAirports = (plan?.order ?? []).map((name) => placeByName(name)?.kind === "airport");
 
   const aiBrief: ItineraryBrief | null = plan

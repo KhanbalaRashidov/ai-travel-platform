@@ -204,7 +204,10 @@ type PricePlanner struct {
 	fares        FareResolver  // optional real-price source
 	fareDeadline time.Duration // per-leg cold-fetch budget (0 = unbounded)
 	tripDate     string        // per-call context for the fare resolver
+	tripReturn   string        // return date, for prefilled round-trip deep-links
 	tripAdults   int
+	tripChildren int
+	tripInfants  int
 }
 
 // NewPricePlanner wires the priced planner.
@@ -230,7 +233,7 @@ func (p *PricePlanner) WithFareDeadline(d time.Duration) *PricePlanner {
 func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []pricefetch.Candidate, tier Tier, disp float64, cur string, payable float64) LegQuote {
 	url := q.DeepLink
 	if url == "" {
-		url = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
+		url = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripReturn, p.tripAdults, p.tripChildren, p.tripInfants)
 	}
 	alts := make([]LegAlt, 0, len(chain))
 	var chosenDetail LegAlt
@@ -241,7 +244,7 @@ func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []
 		}
 		link := c.URL
 		if link == "" {
-			link = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
+			link = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripReturn, p.tripAdults, p.tripChildren, p.tripInfants)
 		}
 		a := LegAlt{
 			Source: c.Source, Price: round2(d), URL: link, Chosen: eqFold(c.Source, q.Source),
@@ -431,8 +434,10 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	if nights < 1 {
 		nights = 1
 	}
-	// Per-call context for the real fare resolver (date + party size).
+	// Per-call context for the real fare resolver + prefilled deep-links
+	// (dates + party size).
 	p.tripDate, p.tripAdults = req.StartDate, req.Adults
+	p.tripReturn, p.tripChildren, p.tripInfants = req.ReturnDate, req.Children, req.Infants
 	// Payable-passenger multiplier (children discounted, infants ~free) scales
 	// transport + activities; travelers drives the per-person figure.
 	payable := payablePax(req)

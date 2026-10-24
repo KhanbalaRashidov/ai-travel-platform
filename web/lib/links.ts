@@ -12,6 +12,41 @@ function enc(s: string): string {
   return encodeURIComponent(s.trim());
 }
 
+// yymmdd formats YYYY-MM-DD as the yyMMdd Skyscanner expects ("" if unparseable).
+function yymmdd(date?: string): string {
+  if (!date) return "";
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[1].slice(2) + m[2] + m[3] : "";
+}
+
+// skyscannerFlightLink builds a prefilled Skyscanner search from IATA/airport
+// codes (D14): route + date(s) + passengers. Returns "" when codes are missing
+// so the caller can keep the name-based fallback (Google Flights).
+export function skyscannerFlightLink(
+  fromCode?: string,
+  toCode?: string,
+  startDate?: string,
+  returnDate?: string,
+  adults = 1,
+  children = 0,
+  infants = 0
+): string {
+  const f = (fromCode ?? "").trim().toLowerCase();
+  const t = (toCode ?? "").trim().toLowerCase();
+  if (f.length < 3 || t.length < 3) return "";
+  const out = yymmdd(startDate);
+  const ret = yymmdd(returnDate);
+  const path = ["https://www.skyscanner.net/transport/flights", f, t, out, ret]
+    .filter((s, i) => i < 3 || s) // always keep host/from/to; dates only if set
+    .join("/");
+  const q = new URLSearchParams({
+    adults: String(Math.max(1, adults)),
+    children: String(Math.max(0, children)),
+    infants: String(Math.max(0, infants)),
+  });
+  return `${path}/?${q.toString()}`;
+}
+
 // hotelSites returns prefilled searches on the major hotel sites for a city and
 // stay. checkin/checkout are YYYY-MM-DD (optional); adults >= 1.
 export function hotelSites(
