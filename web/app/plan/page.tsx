@@ -939,6 +939,8 @@ export default function PlanPage() {
                 roadmap={roadmap}
                 onRoadmap={setRoadmap}
                 hotels={plan.hotel_lines ?? []}
+                onCityNights={changeCityNights}
+                nightsFor={nightsFor}
               />
             </div>
           </section>

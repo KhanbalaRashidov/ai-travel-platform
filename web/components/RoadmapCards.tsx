@@ -36,11 +36,17 @@ export function RoadmapCards({
   roadmap,
   travelers = 1,
   hotels,
+  onNights,
+  nightsFor,
   labels,
 }: {
   roadmap: Roadmap;
   travelers?: number;
   hotels?: HotelLine[];
+  // D9: editable per-city nights, synced with the D7 list. Editing re-plans; the
+  // "Regenerate" button then rebuilds the roadmap with the new nights.
+  onNights?: (city: string, n: number) => void;
+  nightsFor?: (city: string) => number;
   labels: {
     day: (n: number) => string;
     nights: (n: number) => string;
@@ -52,6 +58,7 @@ export function RoadmapCards({
     perPerson: string;
     hotel: string;
     perNight: string;
+    regenHint: string;
   };
 }) {
   const cityInfo = new Map(roadmap.cities.map((c) => [c.city.toLowerCase(), c]));
@@ -100,9 +107,39 @@ export function RoadmapCards({
                 <div className="mb-2 mt-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-display text-base font-bold">{info.city}</h3>
-                    {info.nights > 0 && (
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                        {labels.nights(info.nights)}
+                    {onNights ? (
+                      // Editable nights (D9), bound to the live value so it stays
+                      // in sync with the D7 list; editing re-plans.
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                        <button
+                          type="button"
+                          onClick={() => onNights(info.city, (nightsFor ? nightsFor(info.city) : info.nights) - 1)}
+                          aria-label={`fewer nights in ${info.city}`}
+                          className="grid h-4 w-4 place-items-center rounded-full hover:bg-primary/20"
+                        >
+                          −
+                        </button>
+                        <span className="tabular-nums">{labels.nights(nightsFor ? nightsFor(info.city) : info.nights)}</span>
+                        <button
+                          type="button"
+                          onClick={() => onNights(info.city, (nightsFor ? nightsFor(info.city) : info.nights) + 1)}
+                          aria-label={`more nights in ${info.city}`}
+                          className="grid h-4 w-4 place-items-center rounded-full hover:bg-primary/20"
+                        >
+                          +
+                        </button>
+                      </span>
+                    ) : (
+                      info.nights > 0 && (
+                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                          {labels.nights(info.nights)}
+                        </span>
+                      )
+                    )}
+                    {/* Hint when the live nights no longer match this roadmap. */}
+                    {onNights && nightsFor && nightsFor(info.city) !== info.nights && (
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                        {labels.regenHint}
                       </span>
                     )}
                     {info.best_season && (

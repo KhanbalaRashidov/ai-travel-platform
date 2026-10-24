@@ -33,6 +33,8 @@ export function AIPanel({
   roadmap,
   onRoadmap,
   hotels,
+  onCityNights,
+  nightsFor,
 }: {
   brief: ItineraryBrief | null;
   refineState: EditState | null;
@@ -43,6 +45,9 @@ export function AIPanel({
   onRoadmap: (r: Roadmap | null) => void;
   // Priced hotels, so each roadmap city can show its hotel + Booking + Maps (D2).
   hotels?: HotelLine[];
+  // D9: edit per-city nights from the roadmap (synced with the D7 list).
+  onCityNights?: (city: string, n: number) => void;
+  nightsFor?: (city: string) => number;
 }) {
   const { t, locale } = useI18n();
   const [aiOff, setAiOff] = useState(false);
@@ -194,6 +199,8 @@ export function AIPanel({
               roadmap={itin}
               travelers={brief?.travelers ?? 1}
               hotels={hotels}
+              onNights={onCityNights}
+              nightsFor={nightsFor}
               labels={{
                 day: (n) => t("res.day", { n }),
                 nights: (n) => t("res.nights", { n }),
@@ -205,6 +212,7 @@ export function AIPanel({
                 perPerson: t("res.perPerson"),
                 hotel: t("res.hotelWord"),
                 perNight: t("res.perNight"),
+                regenHint: t("ai.itin.regenHint"),
               }}
             />
           )}
