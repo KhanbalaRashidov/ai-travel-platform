@@ -156,6 +156,35 @@ func TestPlan_RoundTripReturnLeg(t *testing.T) {
 	}
 }
 
+// E6: with an origin + a return date, the plan is a round trip whose LAST leg
+// returns from the final city to the origin, included in the total; the origin
+// takes no nights (C3).
+func TestPlan_ReturnLegToOriginWithReturnDate(t *testing.T) {
+	p := newTestPlanner()
+	res, err := p.Plan(context.Background(), "t1", PlanRequest{
+		Cities: []string{"Tbilisi", "Istanbul"}, Origin: "Baku",
+		Mode: "flight", Tier: "standard", Currency: "EUR",
+		StartDate: "2026-07-01", ReturnDate: "2026-07-07",
+	})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if res.Variant != "round_trip" {
+		t.Fatalf("a return date must yield a round trip, got %q", res.Variant)
+	}
+	if res.Order[0] != "Baku" {
+		t.Fatalf("origin must lead the order, got %v", res.Order)
+	}
+	last := res.Legs[len(res.Legs)-1]
+	if last.To != "Baku" {
+		t.Fatalf("final leg must return to the origin, got %s -> %s", last.From, last.To)
+	}
+	// Origin takes no nights (C3): Baku's slot in NightsByCity is 0.
+	if res.NightsByCity[0] != 0 {
+		t.Fatalf("origin must have 0 nights, got %d (%v)", res.NightsByCity[0], res.NightsByCity)
+	}
+}
+
 func TestPlan_PassengerScaling(t *testing.T) {
 	p := newTestPlanner()
 	mk := func(adults int) PlanResult {

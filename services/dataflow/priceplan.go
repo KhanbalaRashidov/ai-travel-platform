@@ -525,6 +525,18 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		altVariant, altCostEUR = string(alt.Variant), alt.Cost
 	}
 
+	// A return date means the traveller goes home on that date, so present a round
+	// trip — the return leg (last -> start/origin) is priced and shown, even if an
+	// open-jaw was marginally cheaper (E6). No return date => open-jaw, no return
+	// leg. On an explicit re-price the client echoes the plan's variant, so this
+	// only forces it when sequencing (first plan).
+	if len(req.Order) == 0 && strings.TrimSpace(req.ReturnDate) != "" && len(order) >= 2 {
+		if variant != string(planner.RoundTrip) {
+			altVariant, altCostEUR = variant, 0 // the open-jaw becomes the alternative
+			variant = string(planner.RoundTrip)
+		}
+	}
+
 	// Price each leg through the flywheel.
 	legs := make([]LegQuote, 0, len(order))
 	priced := make([]planner.PricedLeg, 0, len(order))

@@ -888,10 +888,24 @@ export default function PlanPage() {
                 </div>
                 <div className="mt-4">
                   <RouteTimeline
-                    stops={plan.order ?? []}
+                    // Round-trip: close the loop by repeating the origin as a
+                    // final stop, so the return leg (last -> origin) reads clearly (E6).
+                    stops={
+                      plan.variant === "round_trip" && (plan.order?.length ?? 0) > 0
+                        ? [...(plan.order ?? []), plan.order![0]]
+                        : plan.order ?? []
+                    }
                     legs={timelineLegs}
-                    nights={plan.nights_by_city ?? []}
-                    airports={stopAirports}
+                    nights={
+                      plan.variant === "round_trip"
+                        ? [...(plan.nights_by_city ?? []), 0]
+                        : plan.nights_by_city ?? []
+                    }
+                    airports={
+                      plan.variant === "round_trip"
+                        ? [...stopAirports, stopAirports[0] ?? false]
+                        : stopAirports
+                    }
                     airportLabel={t("res.airport")}
                     nightLabel={(n) => t("res.nights", { n })}
                     modeOptions={modeOptions}
