@@ -43,6 +43,7 @@ interface Pending {
   children: number;
   infants: number;
   cityNights: Record<string, number>;
+  cityStars: Record<string, number>;
 }
 
 function sameNames(a: Place[], b: Place[]): boolean {
@@ -108,6 +109,7 @@ export default function PlanPage() {
   const [copied, setCopied] = useState(false);
   const [legModes, setLegModes] = useState<Record<string, string>>({});
   const [cityNights, setCityNights] = useState<Record<string, number>>({});
+  const [cityStars, setCityStars] = useState<Record<string, number>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // Restore a shared plan from ?s= (base64 of the selection) and auto-compute.
@@ -141,7 +143,7 @@ export default function PlanPage() {
           places: pl, origin: null, budget: 0, start: st, mode: d.m ?? "cheapest", tier: d.t ?? "standard",
           nights: 2, currency: d.cu ?? "EUR", order: undefined, legModes: {},
           startDate: d.d ?? "", returnDate: d.r ?? "",
-          adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0, cityNights: {},
+          adults: d.ad ?? 1, children: d.ch ?? 0, infants: d.inf ?? 0, cityNights: {}, cityStars: {},
         });
       }
     } catch {
@@ -214,6 +216,7 @@ export default function PlanPage() {
         children: p.children,
         infants: p.infants,
         city_nights: Object.keys(p.cityNights).length ? p.cityNights : undefined,
+        city_stars: Object.keys(p.cityStars).length ? p.cityStars : undefined,
       });
       if (seq !== planSeq.current) return; // a newer request superseded this one
       setPlan(q);
@@ -278,6 +281,7 @@ export default function PlanPage() {
       children,
       infants,
       cityNights,
+      cityStars,
     };
   }
 
@@ -349,6 +353,13 @@ export default function PlanPage() {
     setCityNights(next);
     if (plan) setPending({ ...base(plan.order), cityNights: next });
   }
+  // Per-city hotel star selector (D6): override one city's hotel tier and
+  // re-price the same order live (total + per-person update).
+  function changeCityStars(name: string, stars: number) {
+    const next = { ...cityStars, [name]: stars };
+    setCityStars(next);
+    if (plan) setPending({ ...base(plan.order), cityStars: next });
+  }
   // Passenger changes re-price the same order live (per-person + totals update).
   function changeAdults(v: number) {
     const n = Math.max(1, v);
@@ -401,6 +412,7 @@ export default function PlanPage() {
         children,
         infants,
         cityNights,
+        cityStars,
       });
     }
   }
@@ -853,6 +865,7 @@ export default function PlanPage() {
                   food={foodItems}
                   foodTotal={foodVal}
                   hotelSites={(c: string) => hotelSites(c, startDate || undefined, returnDate || undefined, adults)}
+                  onHotelStars={changeCityStars}
                   city={(name: string) => name}
                   currency={plan.currency}
                   fmt={fmt}

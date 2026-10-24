@@ -255,6 +255,13 @@ export interface PlanLeg {
   baggage?: string;
 }
 
+export interface HotelAlt {
+  stars: number;
+  nightly: number;
+  total: number;
+  chosen: boolean;
+}
+
 export interface HotelLine {
   city: string;
   stars: number;
@@ -266,6 +273,7 @@ export interface HotelLine {
   source: string;
   url?: string;
   fetched_at?: string;
+  alts?: HotelAlt[]; // other star tiers for this city (D6), chosen marked
 }
 
 export interface PlanQuote {
@@ -310,6 +318,7 @@ export interface PlanQuoteReq {
   children?: number;
   infants?: number;
   city_nights?: Record<string, number>; // per-city nights override (stepper)
+  city_stars?: Record<string, number>; // per-city hotel star override (D6)
 }
 
 export function planQuote(req: PlanQuoteReq): Promise<PlanQuote> {

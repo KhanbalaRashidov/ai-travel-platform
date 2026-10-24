@@ -90,6 +90,7 @@ export function CostBreakdown({
   food,
   foodTotal = 0,
   hotelSites,
+  onHotelStars,
   currency,
   labels,
   fmt,
@@ -99,6 +100,8 @@ export function CostBreakdown({
   hotels: HotelLine[];
   // D5: pre-filled hotel-site links for side-by-side comparison (no fake prices).
   hotelSites?: (city: string) => SiteLink[];
+  // D6: switch one city's hotel star tier and re-price live.
+  onHotelStars?: (city: string, stars: number) => void;
   activities: number;
   // D1: when present, the Activities section expands into one row per planned
   // place (city · name · free/~price · Maps), and its sum is the figure shown.
@@ -220,6 +223,28 @@ export function CostBreakdown({
               labels={labels}
               fmt={fmt}
             >
+              {/* D6: pick this city's hotel tier (cheapest first), re-price live. */}
+              {onHotelStars && h.alts && h.alts.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  {h.alts.map((a, k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => onHotelStars(h.city, a.stars)}
+                      className={
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors hover:border-primary/50 " +
+                        (a.chosen
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "border-border text-muted")
+                      }
+                    >
+                      <span>{a.stars}★</span>
+                      <span className="tabular-nums">{fmt(a.nightly)} {currency}</span>
+                      {a.chosen && <span>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                 {/* D5: compare hotel sites side-by-side; prefilled links only, no
                     fabricated per-site prices (the nightly shown is the estimate). */}

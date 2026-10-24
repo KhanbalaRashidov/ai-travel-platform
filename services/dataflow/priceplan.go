@@ -48,6 +48,18 @@ type HotelLine struct {
 	Source    string  `json:"source"`
 	URL       string  `json:"url"`
 	FetchedAt string  `json:"fetched_at,omitempty"`
+	// Alts are the other star tiers for this city (cheapest first), so the user
+	// can switch a single city's hotel and re-price live (D6). Nightly/Total are
+	// display-currency estimates; the chosen one is marked.
+	Alts []HotelAlt `json:"alts,omitempty"`
+}
+
+// HotelAlt is one selectable hotel option (a star tier) for a city.
+type HotelAlt struct {
+	Stars   int     `json:"stars"`
+	Nightly float64 `json:"nightly"` // display currency
+	Total   float64 `json:"total"`   // display currency
+	Chosen  bool    `json:"chosen"`
 }
 
 // LegAlt is one source's price for a leg, with its real deep-link (the
@@ -131,6 +143,11 @@ type PlanRequest struct {
 	// (the per-city stepper). Cities without an entry use the date-driven
 	// allocation / AI-recommended default.
 	CityNights map[string]int `json:"city_nights"`
+
+	// CityStars overrides the hotel star tier for a specific city (the per-city
+	// hotel selector, D6), keyed by city name. Cities without an entry use the
+	// global tier. Values are clamped to 2..5.
+	CityStars map[string]int `json:"city_stars"`
 }
 
 // Geocoder builds a case-insensitive geocoder from the request's places, so the
@@ -564,24 +581,51 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	if stars == 0 {
 		stars = 4
 	}
+	// Per-city star override (D6), keyed by lower-cased city name (clamped 2..5).
+	cityStars := make(map[string]int, len(req.CityStars))
+	for name, s := range req.CityStars {
+		if s >= 2 && s <= 5 {
+			cityStars[strings.ToLower(strings.TrimSpace(name))] = s
+		}
+	}
 	hotels := make([]planner.PricedHotel, 0, len(hotelIdx))
 	hotelLines := make([]HotelLine, 0, len(hotelIdx))
 	for _, oi := range hotelIdx {
 		city := order[oi]
-		h, err := p.hotels.Hotel(ctx, city, stars)
+		cityStar := stars
+		if s, ok := cityStars[strings.ToLower(strings.TrimSpace(city))]; ok {
+			cityStar = s
+		}
+		h, err := p.hotels.Hotel(ctx, city, cityStar)
 		if err != nil {
 			return PlanResult{}, err
 		}
 		if h.Estimated {
 			anyEstimated = true
 		}
-		hotels = append(hotels, planner.PricedHotel{City: oi, Stars: h.Stars, Nights: nightsByCity[oi], Nightly: h.Nightly})
+		nights := nightsByCity[oi]
+		hotels = append(hotels, planner.PricedHotel{City: oi, Stars: h.Stars, Nights: nights, Nightly: h.Nightly})
 		nightlyDisp, _ := p.conv.Convert(h.Nightly.Amount, h.Nightly.Currency, cur)
+		// Alternatives: the other star tiers for this city (cheapest first), so a
+		// single city's hotel can be switched and re-priced live (D6).
+		var alts []HotelAlt
+		for _, t := range []int{3, 4, 5} {
+			ah, err := p.hotels.Hotel(ctx, city, t)
+			if err != nil {
+				continue
+			}
+			an, _ := p.conv.Convert(ah.Nightly.Amount, ah.Nightly.Currency, cur)
+			alts = append(alts, HotelAlt{
+				Stars: ah.Stars, Nightly: round2(an), Total: round2(an * float64(nights)),
+				Chosen: ah.Stars == h.Stars,
+			})
+		}
 		hotelLines = append(hotelLines, HotelLine{
-			City: city, Stars: h.Stars, Name: h.Name, Nights: nightsByCity[oi],
-			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[oi])),
+			City: city, Stars: h.Stars, Name: h.Name, Nights: nights,
+			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nights)),
 			Estimated: h.Estimated, Source: h.Source, FetchedAt: fetchedAtStr(h.FetchedAt),
-			URL: pricefetch.HotelLink(city, req.StartDate, req.ReturnDate, req.Adults),
+			URL:  pricefetch.HotelLink(city, req.StartDate, req.ReturnDate, req.Adults),
+			Alts: alts,
 		})
 	}
 	activitiesEUR := activitiesPerNightEUR * float64(totalNights) * payable
