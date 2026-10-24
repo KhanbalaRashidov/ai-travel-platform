@@ -67,7 +67,7 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   const btn =
-    "grid h-7 w-7 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-primary/40 hover:text-text disabled:opacity-40";
+    "grid h-9 w-9 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-primary/40 hover:text-text disabled:opacity-40";
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-sm">{label}</span>
