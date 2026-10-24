@@ -385,6 +385,40 @@ func (p *PricePlanner) estimateLeg(ctx context.Context, tenantID, from, to, mode
 	return best, bestTier, found
 }
 
+// priceLeg resolves and prices one leg (outbound OR return) consistently: it
+// honours a per-leg mode override (else the global mode), falls back to the
+// cheapest feasible mode when the requested one is geographically impossible
+// (flagging it, C6), and returns the display-currency LegQuote (with detail +
+// alternatives + a real deep-link) plus the EUR group amount for the engine.
+// ok=false means no mode at all was feasible for the leg.
+func (p *PricePlanner) priceLeg(ctx context.Context, tenantID, from, to string, legModes map[string]string, defaultMode string, payable float64, cur string) (lq LegQuote, group conn.Money, estimated, ok bool, err error) {
+	legMode := defaultMode
+	if m, o := legModes[from+"|"+to]; o && isValidLegMode(m) {
+		legMode = m
+	}
+	q, chain, tier, o := p.cheapestLeg(ctx, tenantID, from, to, legMode)
+	unavailable := false
+	requested := ""
+	if !o && legMode != "" && legMode != "cheapest" {
+		requested = legMode
+		q, chain, tier, o = p.cheapestLeg(ctx, tenantID, from, to, "cheapest")
+		unavailable = o
+	}
+	if !o {
+		return LegQuote{}, conn.Money{}, false, false, nil
+	}
+	groupEUR := q.Price.Amount * payable // transport scales with payable passengers
+	disp, e := p.conv.Convert(groupEUR, q.Price.Currency, cur)
+	if e != nil {
+		return LegQuote{}, conn.Money{}, false, false, e
+	}
+	lq = p.legQuote(from, to, q, chain, tier, disp, cur, payable)
+	if unavailable {
+		lq.RequestedMode, lq.ModeUnavailable = requested, true
+	}
+	return lq, conn.Money{Amount: groupEUR, Currency: q.Price.Currency}, q.Estimated, true, nil
+}
+
 // Plan prices a full trip. It resolves the city order (TSP, unless a matching
 // Order is given), prices every leg through the flywheel, hotels + activities
 // through the estimator, and converts everything to the display currency.
@@ -489,60 +523,32 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 	priced := make([]planner.PricedLeg, 0, len(order))
 	anyEstimated := false
 	for i := 0; i+1 < len(order); i++ {
-		// A per-leg override (from the alternatives selector) wins over the
-		// global mode; it only affects pricing, never the sequence.
-		legMode := req.Mode
-		if m, ok := req.LegModes[order[i]+"|"+order[i+1]]; ok && isValidLegMode(m) {
-			legMode = m
-		}
-		q, chain, tier, ok := p.cheapestLeg(ctx, tenantID, order[i], order[i+1], legMode)
-		// Requested mode not available for this leg (e.g. a bus/ferry where the
-		// geography doesn't allow it): fall back to the cheapest feasible mode and
-		// flag it, instead of failing the whole plan (C6).
-		unavailable := false
-		requested := ""
-		if !ok && legMode != "" && legMode != "cheapest" {
-			requested = legMode
-			q, chain, tier, ok = p.cheapestLeg(ctx, tenantID, order[i], order[i+1], "cheapest")
-			unavailable = ok
+		lq, grp, est, ok, err := p.priceLeg(ctx, tenantID, order[i], order[i+1], req.LegModes, req.Mode, payable, cur)
+		if err != nil {
+			return PlanResult{}, err
 		}
 		if !ok {
 			return PlanResult{}, ErrLegUnavailable
 		}
-		// Transport scales with the number of payable passengers.
-		groupEUR := q.Price.Amount * payable
-		disp, err := p.conv.Convert(groupEUR, q.Price.Currency, cur)
-		if err != nil {
-			return PlanResult{}, err
-		}
-		if q.Estimated {
+		if est {
 			anyEstimated = true
 		}
-		lq := p.legQuote(order[i], order[i+1], q, chain, tier, disp, cur, payable)
-		if unavailable {
-			lq.RequestedMode, lq.ModeUnavailable = requested, true
-		}
 		legs = append(legs, lq)
-		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
+		priced = append(priced, planner.PricedLeg{From: i, To: i + 1, Mode: conn.TransportMode(lq.Mode), Price: grp})
 	}
 
-	// Round-trip: price the return leg (last -> start) so the total reflects the
-	// journey home, matching the round-trip variant and the closed map loop.
+	// Round-trip: price the return leg (last -> origin/start) for the SAME selected
+	// mode (or per-leg override), with the same unavailable-mode fallback, its own
+	// detail/alternatives/real link — just like an outbound leg (D13). The origin
+	// still takes no hotel/nights (C3). Included in the total.
 	if variant == string(planner.RoundTrip) && len(order) >= 2 {
 		from, to := order[len(order)-1], order[0]
-		rm := req.Mode
-		if m, ok := req.LegModes[from+"|"+to]; ok && isValidLegMode(m) {
-			rm = m
-		}
-		if q, chain, tier, ok := p.cheapestLeg(ctx, tenantID, from, to, rm); ok {
-			groupEUR := q.Price.Amount * payable
-			if disp, err := p.conv.Convert(groupEUR, q.Price.Currency, cur); err == nil {
-				if q.Estimated {
-					anyEstimated = true
-				}
-				legs = append(legs, p.legQuote(from, to, q, chain, tier, disp, cur, payable))
-				priced = append(priced, planner.PricedLeg{From: len(order) - 1, To: 0, Mode: q.Mode, Price: conn.Money{Amount: groupEUR, Currency: q.Price.Currency}})
+		if lq, grp, est, ok, err := p.priceLeg(ctx, tenantID, from, to, req.LegModes, req.Mode, payable, cur); err == nil && ok {
+			if est {
+				anyEstimated = true
 			}
+			legs = append(legs, lq)
+			priced = append(priced, planner.PricedLeg{From: len(order) - 1, To: 0, Mode: conn.TransportMode(lq.Mode), Price: grp})
 		}
 	}
 
