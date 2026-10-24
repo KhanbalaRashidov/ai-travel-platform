@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/models.dart';
 import '../../state/settings_controller.dart';
 import '../../widgets/common.dart';
-import '../../widgets/money.dart';
 import 'plan_state.dart';
+import 'widgets/cost_breakdown.dart';
 import 'widgets/route_timeline.dart';
 
 /// The computed plan. F3 shows the optimal order + headline totals; the route
@@ -55,7 +55,7 @@ class ResultSection extends ConsumerWidget {
         const SizedBox(height: 12),
         RouteTimeline(q: q),
         const SizedBox(height: 12),
-        _TotalsCard(q: q),
+        CostBreakdown(q: q),
       ],
     );
   }
@@ -117,81 +117,3 @@ class _OrderCard extends ConsumerWidget {
   }
 }
 
-class _TotalsCard extends ConsumerWidget {
-  const _TotalsCard({required this.q});
-  final PlanQuote q;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(tProvider);
-    final scheme = Theme.of(context).colorScheme;
-    final cur = q.currency;
-
-    Widget row(String label, num value, {bool bold = false}) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-                    fontSize: bold ? 15 : 13.5)),
-            Text(money(value, cur),
-                style: TextStyle(
-                    fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: bold ? 16 : 14,
-                    color: bold ? scheme.primary : scheme.onSurface)),
-          ],
-        ),
-      );
-    }
-
-    return SectionCard(
-      title: t('res.liveCost').toUpperCase(),
-      child: Column(
-        children: [
-          row(t('res.transport'), q.transport),
-          const Divider(height: 1),
-          row(t('res.hotels'), q.hotels),
-          const Divider(height: 1),
-          row(t('res.activities'), q.activities),
-          const Divider(height: 8),
-          row(t('res.total'), q.total, bold: true),
-          if (q.perPerson != null && q.travelers != null && q.travelers! > 1)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '${money(q.perPerson!, cur)} · ${t('res.perPerson')}',
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      color: scheme.onSurface.withValues(alpha: 0.65)),
-                ),
-              ),
-            ),
-          if (q.estimated)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline,
-                      size: 14,
-                      color: scheme.onSurface.withValues(alpha: 0.5)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(t('res.disclaimer'),
-                        style: TextStyle(
-                            fontSize: 11,
-                            height: 1.3,
-                            color: scheme.onSurface.withValues(alpha: 0.55))),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
