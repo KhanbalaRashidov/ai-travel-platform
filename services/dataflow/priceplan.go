@@ -295,7 +295,7 @@ func max0(n int) int {
 
 // isValidLegMode reports whether m is an accepted per-leg override.
 func isValidLegMode(m string) bool {
-	return m == "cheapest" || m == "flight" || m == "train" || m == "bus" || m == "ferry"
+	return m == "cheapest" || m == "flight" || m == "train" || m == "bus" || m == "ferry" || m == "car"
 }
 
 // resolveMode maps "cheapest"/"" to a concrete mode for a fare lookup.
@@ -307,6 +307,8 @@ func resolveMode(mode string) conn.TransportMode {
 		return conn.ModeBus
 	case "ferry":
 		return conn.ModeFerry
+	case "car":
+		return conn.ModeCar
 	default:
 		return conn.ModeFlight
 	}

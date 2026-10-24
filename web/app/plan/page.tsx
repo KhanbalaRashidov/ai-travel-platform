@@ -519,6 +519,7 @@ export default function PlanPage() {
     { value: "train", label: t("mode.train") },
     { value: "bus", label: t("mode.bus") },
     { value: "ferry", label: t("mode.ferry") },
+    { value: "car", label: t("mode.car") },
   ];
 
   const mapPoints: MapPoint[] = plan
@@ -769,6 +770,7 @@ export default function PlanPage() {
                 <option value="train">{t("mode.train")}</option>
                 <option value="bus">{t("mode.bus")}</option>
                 <option value="ferry">{t("mode.ferry")}</option>
+                <option value="car">{t("mode.car")}</option>
               </Select>
             </Field>
             <Field label={t("plan.currency")}>

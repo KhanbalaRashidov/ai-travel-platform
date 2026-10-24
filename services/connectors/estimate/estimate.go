@@ -100,6 +100,17 @@ func estimateLeg(km float64, mode conn.TransportMode) (float64, time.Duration, b
 		price := math.Round(0.06 * km)
 		dur := time.Duration((km / 35) * float64(time.Hour)) // ~35 km/h avg
 		return price, dur, true
+	case conn.ModeCar:
+		// Car / taxi / transfer: viable up to a long road trip. Price is an
+		// indicative fuel + wear estimate (~0.15 EUR/km); a straight-line-to-road
+		// factor (~1.3) approximates real driving distance. ~80 km/h average.
+		if km > 1500 {
+			return 0, 0, false
+		}
+		road := km * 1.3
+		price := math.Round(0.15 * road)
+		dur := time.Duration((road / 80) * float64(time.Hour))
+		return price, dur, true
 	}
 	return 0, 0, false
 }

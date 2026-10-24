@@ -32,6 +32,7 @@ const (
 	ModeTrain  TransportMode = "train"
 	ModeBus    TransportMode = "bus"
 	ModeFerry  TransportMode = "ferry"
+	ModeCar    TransportMode = "car" // car / taxi / transfer (distance-based estimate)
 )
 
 // TransportQuote is an indicative price + duration for a city->city leg.

@@ -59,6 +59,14 @@ func DeepLink(from, to, mode, date, returnDate string, adults, children, infants
 	case "ferry":
 		// Direct Ferries, name-based route page.
 		return "https://www.directferries.com/ferry-" + seg(from) + "-" + seg(to) + ".htm"
+	case "car":
+		// Google Maps driving directions, route prefilled.
+		q := url.Values{}
+		q.Set("api", "1")
+		q.Set("origin", strings.TrimSpace(from))
+		q.Set("destination", strings.TrimSpace(to))
+		q.Set("travelmode", "driving")
+		return "https://www.google.com/maps/dir/?" + q.Encode()
 	case "flight":
 		// Google Flights name-based query (resolves city names without IATA; the
 		// frontend upgrades this to Skyscanner with IATA codes for airport stops).

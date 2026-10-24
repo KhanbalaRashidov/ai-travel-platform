@@ -52,6 +52,16 @@ export function FerryIcon(p: P) {
   );
 }
 
+export function CarIcon(p: P) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3 13l2-5h14l2 5M3 13h18v4H3zM5 17v2M19 17v2" />
+      <circle cx="7.5" cy="13.5" r="1" />
+      <circle cx="16.5" cy="13.5" r="1" />
+    </svg>
+  );
+}
+
 export function PinIcon(p: P) {
   return (
     <svg {...base} {...p}>
@@ -109,5 +119,6 @@ export function ModeIcon({ mode, ...p }: P & { mode: string }) {
   if (mode === "train") return <TrainIcon {...p} />;
   if (mode === "bus") return <BusIcon {...p} />;
   if (mode === "ferry") return <FerryIcon {...p} />;
+  if (mode === "car") return <CarIcon {...p} />;
   return <PlaneIcon {...p} />;
 }
