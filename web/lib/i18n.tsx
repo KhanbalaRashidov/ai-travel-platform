@@ -10,7 +10,9 @@ export const LOCALE_LABEL: Record<Locale, string> = {
   ru: "RU",
   tr: "TR",
 };
-const DEFAULT_LOCALE: Locale = "az";
+// First paint (SSR + initial client render) is English so there is no hydration
+// mismatch/flash; a returning user's saved locale is applied after mount (D21).
+const DEFAULT_LOCALE: Locale = "en";
 const FALLBACK: Locale = "en";
 
 // Default display currency per locale (we only carry EUR/USD/AZN rates).
