@@ -40,7 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="relative">{children}</div>
+      {/* isolate: trap descendant stacking (e.g. Leaflet's z-index-heavy map
+          controls) inside the content so nothing paints over the sticky header. */}
+      <div className="relative isolate">{children}</div>
       <footer className="mx-auto max-w-5xl px-4 py-10 text-center text-xs text-muted">
         AI Travel Platform · advisory only — no booking, no payment · prices are
         indicative, confirm on the provider&apos;s site · map data © OpenStreetMap.

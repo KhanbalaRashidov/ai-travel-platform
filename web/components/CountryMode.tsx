@@ -127,8 +127,8 @@ export function CountryMode({
                       }}
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
                     >
-                      <span>{m.name}</span>
-                      <span className="text-[11px] text-muted">{m.code}</span>
+                      <span className="min-w-0 truncate">{m.name}</span>
+                      <span className="shrink-0 text-[11px] text-muted">{m.code}</span>
                     </button>
                   </li>
                 ))}
@@ -193,11 +193,11 @@ export function CountryMode({
                       return (
                         <div key={j} className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="flex items-center gap-1.5 font-semibold">
+                            <span className="flex min-w-0 items-center gap-1.5 font-semibold">
                               <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-accent/15 text-[10px] font-bold text-accent">
                                 {j + 1}
                               </span>
-                              {c.city}
+                              <span className="truncate">{c.city}</span>
                             </span>
                             {/* Rating only when a real source provided it — no fake stars. */}
                             {typeof c.rating === "number" && c.rating > 0 && (

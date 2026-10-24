@@ -591,10 +591,10 @@ export default function PlanPage() {
           <Field label={t("plan.origin")}>
             {origin ? (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
-                  <PinIcon width={13} height={13} />
-                  {origin.name}
-                  <span className="text-accent/70">· {t("plan.originNote")}</span>
+                <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
+                  <PinIcon width={13} height={13} className="shrink-0" />
+                  <span className="min-w-0 truncate">{origin.name}</span>
+                  <span className="shrink-0 text-accent/70">· {t("plan.originNote")}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -662,17 +662,17 @@ export default function PlanPage() {
                     if (dragIdx !== null) reorderDest(dragIdx, i);
                     setDragIdx(null);
                   }}
-                  className="inline-flex cursor-grab items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary active:cursor-grabbing"
+                  className="inline-flex max-w-full cursor-grab items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary active:cursor-grabbing"
                   title={t("plan.dragHint")}
                 >
-                  <span className="text-primary/50">⠿</span>
-                  <PinIcon width={13} height={13} />
-                  {p.name}
+                  <span className="shrink-0 text-primary/50">⠿</span>
+                  <PinIcon width={13} height={13} className="shrink-0" />
+                  <span className="min-w-0 truncate">{p.name}</span>
                   <button
                     type="button"
                     onClick={() => removePlace(p.name)}
                     aria-label={`remove ${p.name}`}
-                    className="ml-0.5 text-primary/70 transition-colors hover:text-primary"
+                    className="ml-0.5 shrink-0 text-primary/70 transition-colors hover:text-primary"
                   >
                     ×
                   </button>

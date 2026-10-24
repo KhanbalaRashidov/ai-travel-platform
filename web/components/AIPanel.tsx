@@ -254,7 +254,7 @@ export function AIPanel({
             <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
               <div
                 className={
-                  "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm " +
+                  "max-w-[85%] break-words [overflow-wrap:anywhere] rounded-2xl px-3.5 py-2 text-sm " +
                   (m.role === "user"
                     ? "whitespace-pre-wrap bg-primary text-primary-fg"
                     : "border border-border bg-surface-2 text-text")

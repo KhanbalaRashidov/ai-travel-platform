@@ -11,7 +11,7 @@ import rehypeSanitize from "rehype-sanitize";
 // as text (the roadmap already provides real Google Maps links).
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="prose-chat text-sm leading-relaxed">
+    <div className="prose-chat break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
@@ -21,7 +21,7 @@ export function Markdown({ children }: { children: string }) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2 hover:opacity-80"
+              className="text-primary underline underline-offset-2 hover:opacity-80 [overflow-wrap:anywhere]"
             >
               {children}
             </a>

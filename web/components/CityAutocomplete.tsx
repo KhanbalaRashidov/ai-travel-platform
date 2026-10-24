@@ -102,7 +102,7 @@ export function CityAutocomplete({
                   }}
                   className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 disabled:opacity-40"
                 >
-                  <span>
+                  <span className="min-w-0 truncate">
                     <span className="font-medium">{p.name}</span>
                     <span className="text-muted">
                       {" "}

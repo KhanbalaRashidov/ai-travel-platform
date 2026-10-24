@@ -54,11 +54,11 @@ export function RouteTimeline({
           className="animate-fade-up"
           style={{ animationDelay: `${i * 70}ms` }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-fg shadow-soft">
               {i + 1}
             </span>
-            <span className="font-display text-base font-semibold">{stop}</span>
+            <span className="min-w-0 break-words font-display text-base font-semibold">{stop}</span>
             {airports[i] && (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
                 ✈ {airportLabel ?? "airport"}
@@ -72,8 +72,8 @@ export function RouteTimeline({
           </div>
 
           {i < legs.length && (
-            <div className="ml-4 flex items-stretch gap-3 border-l-2 border-dashed border-border py-2 pl-6">
-              <div className="flex items-center gap-2 text-sm text-muted">
+            <div className="ml-4 flex flex-wrap items-start gap-x-3 gap-y-1 border-l-2 border-dashed border-border py-2 pl-6">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                 <span className="grid h-7 w-7 place-items-center rounded-lg bg-transport/10 text-transport">
                   <ModeIcon mode={legs[i].mode} width={15} height={15} />
                 </span>

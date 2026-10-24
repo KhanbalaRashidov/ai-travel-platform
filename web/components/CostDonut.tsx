@@ -75,15 +75,15 @@ export function CostDonut({
         </div>
         <ul className="space-y-2">
           {segments.map((s) => (
-            <li key={s.key} className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2 text-muted">
+            <li key={s.key} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex min-w-0 items-center gap-2 text-muted">
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ background: `rgb(var(${s.colorVar}))` }}
                 />
-                {s.label}
+                <span className="truncate">{s.label}</span>
               </span>
-              <span className="font-semibold tabular-nums">{fmt(s.value)}</span>
+              <span className="shrink-0 font-semibold tabular-nums">{fmt(s.value)}</span>
             </li>
           ))}
         </ul>
