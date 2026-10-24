@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto animate-fade-up rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lift backdrop-blur ${tone(t.kind)}`}
+            className={`pointer-events-auto max-w-[calc(100vw-2rem)] animate-fade-up break-words rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lift backdrop-blur ${tone(t.kind)}`}
           >
             {t.msg}
           </div>

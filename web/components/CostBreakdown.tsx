@@ -206,7 +206,7 @@ export function CostBreakdown({
   return (
     <div className="mt-4 space-y-2">
       <details className={section} open>
-        <summary className="flex items-center justify-between text-sm font-semibold">
+        <summary className="flex items-center justify-between gap-2 text-sm font-semibold">
           <span>{catLabels.transport}</span>
           <span className="tabular-nums">{fmt(sum(legs.map((l) => l.price)))} {currency}</span>
         </summary>
@@ -273,7 +273,7 @@ export function CostBreakdown({
       </details>
 
       <details className={section}>
-        <summary className="flex items-center justify-between text-sm font-semibold">
+        <summary className="flex items-center justify-between gap-2 text-sm font-semibold">
           <span>{catLabels.hotels}</span>
           <span className="tabular-nums">{fmt(sum(hotels.map((h) => h.total)))} {currency}</span>
         </summary>
@@ -348,7 +348,7 @@ export function CostBreakdown({
       </details>
 
       <details className={section}>
-        <summary className="flex items-center justify-between text-sm font-semibold">
+        <summary className="flex items-center justify-between gap-2 text-sm font-semibold">
           <span>{catLabels.activities}</span>
           <span className="tabular-nums">{fmt(activities)} {currency}</span>
         </summary>
@@ -374,7 +374,7 @@ export function CostBreakdown({
 
       {food && food.length > 0 && (
         <details className={section}>
-          <summary className="flex items-center justify-between text-sm font-semibold">
+          <summary className="flex items-center justify-between gap-2 text-sm font-semibold">
             <span>{catLabels.food}</span>
             <span className="tabular-nums">~{fmt(foodTotal)} {currency}</span>
           </summary>

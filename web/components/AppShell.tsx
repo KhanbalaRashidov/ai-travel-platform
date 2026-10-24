@@ -9,8 +9,8 @@ import { ThemeToggle } from "./theme";
 // og image and favicon). Kept as inline SVG so it reads crisply light & dark.
 function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <svg width="36" height="36" viewBox="0 0 54 54" className="shadow-soft rounded-[10px]" aria-hidden>
+    <Link href="/" className="flex min-w-0 items-center gap-2.5">
+      <svg width="36" height="36" viewBox="0 0 54 54" className="shadow-soft shrink-0 rounded-[10px]" aria-hidden>
         <defs>
           <linearGradient id="brandMark" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#8B7CF6" />
@@ -20,7 +20,9 @@ function Brand() {
         <rect width="54" height="54" rx="15" fill="url(#brandMark)" />
         <path d="M27 12 L38 39 L27 32 L16 39 Z" fill="#0A0E24" />
       </svg>
-      <span className="font-display text-base font-bold tracking-tight">
+      {/* Hide the wordmark on very narrow phones so the logo + language switcher
+          + theme toggle never overflow the header (gutter preserved). */}
+      <span className="hidden truncate font-display text-base font-bold tracking-tight min-[360px]:inline">
         AI Travel
       </span>
     </Link>
@@ -32,9 +34,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative min-h-screen">
       <div className="aurora pointer-events-none absolute inset-x-0 top-0 h-96" />
       <header className="sticky top-0 z-30 border-b border-border/70 bg-bg/80 backdrop-blur-md print:hidden">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3">
           <Brand />
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
           </div>

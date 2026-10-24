@@ -687,11 +687,11 @@ export default function PlanPage() {
               city has no explicit nights, the AI/date-allocated value is shown. */}
           {places.length > 0 && (
             <div className="mt-4 rounded-xl border border-border bg-surface-2/50 p-3">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {t("plan.nightsTitle")}
                 </span>
-                <span className="text-[11px] text-muted">{t("plan.nightsHint")}</span>
+                <span className="min-w-0 text-[11px] text-muted">{t("plan.nightsHint")}</span>
               </div>
               <ul className="space-y-1.5">
                 {places.map((p, i) => (
@@ -882,8 +882,8 @@ export default function PlanPage() {
             </div>
             <div className="grid gap-4 lg:grid-cols-5">
               <Card className="animate-fade-up lg:col-span-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-display text-lg font-bold">{t("res.planTitle")}</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="min-w-0 break-words font-display text-lg font-bold">{t("res.planTitle")}</h2>
                   <Badge tone={variantTone(plan.variant)}>{variantLabel(plan.variant)}</Badge>
                 </div>
                 <div className="mt-4">

@@ -173,10 +173,10 @@ export function AIPanel({
     <div className="space-y-4">
       {/* Itinerary writer */}
       <Card className="animate-fade-up">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <SparkIcon width={18} height={18} className="text-primary" />
-            <h2 className="font-display text-lg font-bold">{t("ai.itin.title")}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <SparkIcon width={18} height={18} className="shrink-0 text-primary" />
+            <h2 className="min-w-0 break-words font-display text-lg font-bold">{t("ai.itin.title")}</h2>
           </div>
           <Button onClick={generate} disabled={!brief || itinLoading}>
             {itinLoading ? (
