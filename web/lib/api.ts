@@ -1,36 +1,47 @@
-// Typed client for the plan endpoints. The API base is resolved at RUNTIME so
-// the same build works locally, over a LAN (D11) and behind a reverse proxy in
-// production, in this precedence:
-//   1. NEXT_PUBLIC_API_BASE_URL — an explicit, fixed, absolute URL (pin). Wins.
-//   2. NEXT_PUBLIC_API_BASE=same-origin — production behind nginx: the browser
-//      calls /api/v1 on the page's OWN origin (no custom port), so
-//      https://host/api/v1 is proxied to the API. A full URL here is also honored.
-//   3. LAN fallback: built from the page's own host + API port (so a phone
-//      opening http://<lan-ip>:3000 calls http://<lan-ip>:8080) — never a
-//      hardcoded "localhost".
-// SSR/build falls back to localhost (relative for same-origin), but all real
-// requests run client-side.
+// Same-origin API base: the browser calls /api/v1 on the page's OWN origin — same
+// protocol and host, NO custom port — so behind nginx it is
+// https://travel.myalfasoft.com/api/v1, proxied to the API. Relative on SSR
+// (real calls run client-side).
+function sameOriginBase(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api/v1`;
+  }
+  return "/api/v1";
+}
+
+// Append /api/v1 to an absolute base, trimming any trailing slash first.
+function withApiV1(base: string): string {
+  const x = base.replace(/\/+$/, "");
+  return x.endsWith("/api/v1") ? x : `${x}/api/v1`;
+}
+
+// The API base is resolved at RUNTIME so one build works locally, over a LAN
+// (D11) and behind a reverse proxy, in this precedence:
+//   a) NEXT_PUBLIC_API_BASE_URL set (absolute) -> use it verbatim.
+//   b) NEXT_PUBLIC_API_BASE == "same-origin" -> relative /api/v1 (no port).
+//   c) NEXT_PUBLIC_API_BASE is an absolute URL -> that + /api/v1.
+//   d) empty IN PRODUCTION -> same-origin /api/v1 (never a host:port; so behind
+//      nginx the browser never shows :8080/:8090 even if the build arg didn't
+//      bake).
+//   e) empty in DEV only -> LAN fallback: page host + NEXT_PUBLIC_API_PORT.
+// A hardcoded :8080 is never used; the LAN port comes from NEXT_PUBLIC_API_PORT.
 function apiBase(): string {
-  const pinned = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (pinned && pinned.trim() !== "") return pinned;
+  const pinned = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
+  if (pinned !== "") return withApiV1(pinned); // (a)
 
   const mode = (process.env.NEXT_PUBLIC_API_BASE || "").trim();
-  if (mode !== "") {
-    if (mode.toLowerCase() === "same-origin") {
-      if (typeof window !== "undefined" && window.location?.origin) {
-        return `${window.location.origin}/api/v1`;
-      }
-      return "/api/v1"; // SSR: relative (real calls happen client-side)
-    }
-    const base = mode.replace(/\/+$/, "");
-    return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
-  }
+  if (mode.toLowerCase() === "same-origin") return sameOriginBase(); // (b)
+  if (mode !== "") return withApiV1(mode); // (c)
 
+  // mode empty:
+  if (process.env.NODE_ENV === "production") return sameOriginBase(); // (d)
+
+  // (e) dev LAN fallback only
   if (typeof window !== "undefined" && window.location?.hostname) {
-    const port = process.env.NEXT_PUBLIC_API_PORT || "8080";
+    const port = process.env.NEXT_PUBLIC_API_PORT || "8090";
     return `${window.location.protocol}//${window.location.hostname}:${port}/api/v1`;
   }
-  return "http://localhost:8080/api/v1";
+  return "http://localhost:8090/api/v1";
 }
 
 export interface Money {
