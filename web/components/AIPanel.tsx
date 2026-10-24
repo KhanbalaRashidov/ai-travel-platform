@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   chat as chatApi,
@@ -91,6 +91,20 @@ export function AIPanel({
       setItinLoading(false);
     }
   }
+
+  // E5: auto-fill the roadmap/activities with AI as soon as the first plan is
+  // ready (and once per new city set) — no separate button click. Night/order
+  // tweaks keep the D9 "regenerate" hint rather than refetching on every change.
+  const autoKey = brief ? brief.cities.join("|").toLowerCase() : "";
+  const autoFilled = useRef<string>("");
+  useEffect(() => {
+    if (!brief || aiOff || itinLoading || roadmap) return;
+    if (autoKey && autoFilled.current !== autoKey) {
+      autoFilled.current = autoKey; // one auto-attempt per set (no retry loop on error)
+      void generate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoKey, brief, roadmap, aiOff, itinLoading]);
 
   // Render change codes ("mode:cheapest", "removed:Istanbul", "nights:3") as a
   // localized, human-readable confirmation.
