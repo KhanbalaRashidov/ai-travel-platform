@@ -48,13 +48,27 @@ type CityInfo struct {
 	BestSeason string  `json:"best_season,omitempty"`
 	Lat        float64 `json:"lat,omitempty"`
 	Lng        float64 `json:"lng,omitempty"`
+	// FoodPerDay is the model's APPROXIMATE mid-range restaurant spend per person
+	// per day, in EUR (D4). 0 when the model gave none; always "~"-labeled in UI.
+	FoodPerDay float64 `json:"food_per_day,omitempty"`
+}
+
+// FoodEstimate is an approximate per-city restaurant spend (D4): per-day × nights.
+// per_day/total are EUR from the model, converted to the display currency by the
+// handler. Always surfaced as "~approximate".
+type FoodEstimate struct {
+	City   string  `json:"city"`
+	PerDay float64 `json:"per_day"`
+	Nights int     `json:"nights"`
+	Total  float64 `json:"total"`
 }
 
 // Roadmap is the structured, day-by-day, location-based itinerary the UI renders
 // as a connected timeline + map (never raw markdown).
 type Roadmap struct {
-	Cities []CityInfo `json:"cities"`
-	Days   []DayPlan  `json:"days"`
+	Cities []CityInfo     `json:"cities"`
+	Days   []DayPlan      `json:"days"`
+	Food   []FoodEstimate `json:"food,omitempty"`
 }
 
 const roadmapSystem = "You are a budget, travel-loving planner building a LOCATION-BASED, day-by-day itinerary. " +
@@ -63,8 +77,10 @@ const roadmapSystem = "You are a budget, travel-loving planner building a LOCATI
 	"walking/visiting order grouped by proximity. For EACH city also give a warm 1–2 sentence summary and " +
 	"a best_season. Each POI: name, type (sight/museum/food/park/viewpoint/transfer), a short desc, " +
 	"free=true/false, and an APPROXIMATE price like \"~€15\" for paid ones (always prefix ~; free ones omit it). " +
+	"For EACH city also give food_per_day: an APPROXIMATE mid-range restaurant cost per person per day, " +
+	"as a plain EUR number (e.g. 25). " +
 	"Do NOT invent flight, hotel or transport prices. " +
-	"Return STRICT JSON: {\"cities\":[{\"city\":\"\",\"summary\":\"\",\"best_season\":\"\"}]," +
+	"Return STRICT JSON: {\"cities\":[{\"city\":\"\",\"summary\":\"\",\"best_season\":\"\",\"food_per_day\":0}]," +
 	"\"days\":[{\"day\":<int>,\"city\":\"\",\"title\":\"\",\"pois\":[{\"name\":\"\",\"type\":\"\"," +
 	"\"desc\":\"\",\"free\":true,\"price\":\"\"}]}]}."
 
@@ -161,11 +177,14 @@ func StructuredRoadmap(ctx context.Context, llm LLM, cities []string, nights []i
 // numbering days), and each POI's missing coordinate is filled from its city
 // centre. The skeleton's day/city/nights are never overridden.
 func mergeRoadmap(skeleton Roadmap, parsed Roadmap, coords map[string]LatLng) Roadmap {
-	// City summary/season by lower-cased name.
-	type info struct{ summary, season string }
+	// City summary/season/food by lower-cased name.
+	type info struct {
+		summary, season string
+		food            float64
+	}
 	cityInfo := map[string]info{}
 	for _, c := range parsed.Cities {
-		cityInfo[strings.ToLower(strings.TrimSpace(c.City))] = info{c.Summary, c.BestSeason}
+		cityInfo[strings.ToLower(strings.TrimSpace(c.City))] = info{c.Summary, c.BestSeason, c.FoodPerDay}
 	}
 	// All model POIs grouped by city (lower-cased).
 	poolByCity := map[string][]POI{}
@@ -178,7 +197,15 @@ func mergeRoadmap(skeleton Roadmap, parsed Roadmap, coords map[string]LatLng) Ro
 	for _, c := range skeleton.Cities {
 		key := strings.ToLower(strings.TrimSpace(c.City))
 		c.Summary, c.BestSeason = cityInfo[key].summary, cityInfo[key].season
+		c.FoodPerDay = cityInfo[key].food
 		out.Cities = append(out.Cities, c)
+		// Food estimate (D4): per-day × nights, EUR (handler converts to display).
+		if c.FoodPerDay > 0 && c.Nights > 0 {
+			out.Food = append(out.Food, FoodEstimate{
+				City: c.City, PerDay: c.FoodPerDay, Nights: c.Nights,
+				Total: c.FoodPerDay * float64(c.Nights),
+			})
+		}
 	}
 
 	// How many skeleton days each city has (to spread its POIs across them).

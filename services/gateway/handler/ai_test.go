@@ -15,7 +15,7 @@ import (
 
 func aiApp(primary ai.LLM) *fiber.App {
 	app := fiber.New()
-	h := NewAIHandler(primary, primary)
+	h := NewAIHandler(primary, primary, nil)
 	app.Post("/ai/refine", h.Refine)
 	app.Post("/ai/chat", h.Chat)
 	return app

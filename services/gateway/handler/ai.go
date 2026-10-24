@@ -24,13 +24,22 @@ const busyMsg = "AI service is busy, try again shortly"
 type AIHandler struct {
 	primary ai.LLM // reasoning (chat + edit parsing)
 	bulk    ai.LLM // cheap formatting (itinerary)
+	conv    currencyConverter
 	tools   []ai.Tool
 }
 
+// currencyConverter normalizes amounts between currencies (planner.StaticConverter
+// satisfies it); used to convert the roadmap's EUR food estimate to the display
+// currency (D4).
+type currencyConverter interface {
+	Convert(amount float64, from, to string) (float64, error)
+}
+
 // NewAIHandler wires the handler. Pass nil LLMs when the key is not configured;
-// tools (planner/flywheel) are attached to the chat orchestrator.
-func NewAIHandler(primary, bulk ai.LLM, tools ...ai.Tool) *AIHandler {
-	return &AIHandler{primary: primary, bulk: bulk, tools: tools}
+// tools (planner/flywheel) are attached to the chat orchestrator. conv may be nil
+// (food estimates then stay in EUR).
+func NewAIHandler(primary, bulk ai.LLM, conv currencyConverter, tools ...ai.Tool) *AIHandler {
+	return &AIHandler{primary: primary, bulk: bulk, conv: conv, tools: tools}
 }
 
 // Enabled reports whether the AI features are configured.
@@ -111,6 +120,7 @@ type roadmapReq struct {
 	NightsByCity []int           `json:"nights_by_city"`
 	Places       []placeCoordDTO `json:"places"`
 	Locale       string          `json:"locale"`
+	Currency     string          `json:"currency"`
 }
 
 // Roadmap handles POST /ai/roadmap — a STRUCTURED, day-by-day, location-based
@@ -138,8 +148,22 @@ func (h *AIHandler) Roadmap(c *fiber.Ctx) error {
 	if err != nil {
 		log.Printf("ai roadmap: degraded to skeleton: %v", err)
 	}
+	// Convert the EUR food estimate (D4) to the display currency, so the live
+	// cost stays single-currency. Best-effort: leave EUR if conversion fails.
+	cur := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if h.conv != nil && cur != "" && cur != "EUR" {
+		for i := range res.Food {
+			if v, e := h.conv.Convert(res.Food[i].PerDay, "EUR", cur); e == nil {
+				res.Food[i].PerDay = round2(v)
+				res.Food[i].Total = round2(v * float64(res.Food[i].Nights))
+			}
+		}
+	}
 	return httpx.OK(c, res)
 }
+
+// round2 rounds to 2 decimals.
+func round2(f float64) float64 { return float64(int64(f*100+0.5)) / 100 }
 
 type chatReq struct {
 	Message string `json:"message"`

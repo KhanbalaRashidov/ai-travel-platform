@@ -399,9 +399,10 @@ export function roadmap(
   cities: string[],
   nights_by_city: number[],
   places: { name: string; lat: number; lng: number }[],
-  locale = "en"
+  locale = "en",
+  currency = "EUR"
 ): Promise<Roadmap> {
-  const body = { cities, nights_by_city, places, locale };
+  const body = { cities, nights_by_city, places, locale, currency };
   return cached("roadmap:" + JSON.stringify(body), () => postJSON("/ai/roadmap", body));
 }
 

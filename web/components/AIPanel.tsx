@@ -78,7 +78,7 @@ export function AIPanel({
     setItinErr(null);
     try {
       const nbc = brief.nights_by_city ?? [];
-      onRoadmap(await roadmapApi(brief.cities, nbc, brief.places ?? [], locale));
+      onRoadmap(await roadmapApi(brief.cities, nbc, brief.places ?? [], locale, brief.currency));
     } catch (e) {
       if (!handledAsOff(e)) setItinErr(errMessage(e));
     } finally {
