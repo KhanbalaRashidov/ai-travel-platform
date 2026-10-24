@@ -14,6 +14,80 @@ function mapsLink(name: string, city: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + city)}`;
 }
 
+// ActivitiesChain renders the planned activities grouped by city as a station-
+// style chain (vertical rail + a node per city, places hanging off it), inside a
+// fixed-height scroll area so it never pushes the page down (E1). A bottom fade +
+// "+N" hint signals there is more to scroll.
+function ActivitiesChain({
+  items,
+  labels,
+}: {
+  items: { city: string; name: string; free: boolean; price?: string }[];
+  labels: { free: string; approx: string; maps: string };
+}) {
+  // Group consecutive items by city, preserving order.
+  const groups: { city: string; places: typeof items }[] = [];
+  for (const it of items) {
+    const g = groups[groups.length - 1];
+    if (g && g.city.toLowerCase() === it.city.toLowerCase()) g.places.push(it);
+    else groups.push({ city: it.city, places: [it] });
+  }
+  const more = items.length > 5 ? items.length - 5 : 0;
+
+  return (
+    <div className="relative mt-1">
+      <div className="max-h-60 overflow-y-auto pr-1">
+        <div className="relative space-y-2 pl-5">
+          {/* The rail connecting every city node (like the roadmap). */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-2 left-[7px] top-2 w-0.5 bg-gradient-to-b from-primary/40 via-primary/25 to-accent/30"
+          />
+          {groups.map((g, gi) => (
+            <div key={gi} className="relative">
+              {/* City node on the rail. */}
+              <span className="absolute -left-[18px] top-1 z-10 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-surface" />
+              <div className="text-xs font-semibold text-text">{g.city}</div>
+              <ul className="mt-0.5 space-y-0.5">
+                {g.places.map((a, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate">{a.name}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs">
+                      {a.free ? (
+                        <span className="font-medium text-success">{labels.free}</span>
+                      ) : (
+                        <span className="text-accent">{a.price || labels.approx}</span>
+                      )}
+                      <a
+                        href={mapsLink(a.name, a.city)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={labels.maps}
+                        className="text-primary hover:underline"
+                      >
+                        ↗
+                      </a>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+      {more > 0 && (
+        <>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-4 h-8 bg-gradient-to-t from-surface-2 to-transparent"
+          />
+          <div className="pt-0.5 text-center text-[11px] text-muted">↓ +{more}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // hotelMapsLink opens a Maps search for the named hotel (or hotels in the city).
 function hotelMapsLink(name: string, city: string): string {
   const q = name ? `${name} ${city}` : `hotels in ${city}`;
@@ -280,35 +354,7 @@ export function CostBreakdown({
         </summary>
         {activityItems && activityItems.length > 0 ? (
           <>
-            <ul className="mt-1">
-              {activityItems.map((a, i) => (
-                <li
-                  key={i}
-                  className="flex items-center justify-between gap-2 border-t border-border/60 py-1.5 text-sm first:border-t-0"
-                >
-                  <span className="min-w-0 truncate">
-                    <span className="text-muted">{a.city} · </span>
-                    {a.name}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2 text-xs">
-                    {a.free ? (
-                      <span className="font-medium text-success">{labels.free}</span>
-                    ) : (
-                      <span className="text-accent">{a.price || labels.approx}</span>
-                    )}
-                    <a
-                      href={mapsLink(a.name, a.city)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={labels.maps}
-                      className="text-primary hover:underline"
-                    >
-                      ↗
-                    </a>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <ActivitiesChain items={activityItems} labels={labels} />
             <p className="mt-1 text-[11px] text-accent">{labels.est}</p>
           </>
         ) : (
