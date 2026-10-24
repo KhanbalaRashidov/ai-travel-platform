@@ -8,6 +8,7 @@ import {
   searchPlaces,
   suggestDestinations,
 } from "../lib/api";
+import { canonicalName, CountryOption, searchCountries } from "../lib/countries";
 import { useI18n } from "../lib/i18n";
 import { Button } from "./ui";
 import { PinIcon, SparkIcon } from "./icons";
@@ -31,20 +32,22 @@ export function CountryMode({
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [countries, setCountries] = useState<string[]>([]);
+  const [countries, setCountries] = useState<CountryOption[]>([]);
   const [data, setData] = useState<DestinationSuggestions | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
 
-  function addCountry(name: string) {
-    const c = name.trim();
-    if (!c) return;
-    if (!countries.some((x) => x.toLowerCase() === c.toLowerCase())) setCountries([...countries, c]);
+  const matches = searchCountries(input, locale, 8).filter(
+    (m) => !countries.some((c) => c.code === m.code)
+  );
+
+  function addCountry(c: CountryOption) {
+    if (!countries.some((x) => x.code === c.code)) setCountries([...countries, c]);
     setInput("");
   }
-  function removeCountry(name: string) {
-    setCountries(countries.filter((c) => c !== name));
+  function removeCountry(code: string) {
+    setCountries(countries.filter((c) => c.code !== code));
   }
 
   async function suggest() {
@@ -52,7 +55,8 @@ export function CountryMode({
     setLoading(true);
     setErr(null);
     try {
-      setData(await suggestDestinations(countries, budget, currency, locale));
+      // Send canonical English names so the AI resolves them regardless of UI language.
+      setData(await suggestDestinations(countries.map((c) => canonicalName(c.code)), budget, currency, locale));
     } catch (e) {
       setErr(e instanceof ApiError && (e.status === 503 || e.status === 429) ? t("ai.busy") : t("ai.error"));
     } finally {
@@ -96,33 +100,46 @@ export function CountryMode({
       {open && (
         <div className="mt-3">
           <p className="mb-2 text-xs text-muted">{t("country.hint")}</p>
-          <div className="flex gap-2">
+          <div className="relative">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && matches.length > 0) {
                   e.preventDefault();
-                  addCountry(input);
+                  addCountry(matches[0]);
                 }
               }}
               placeholder={t("country.placeholder")}
               className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
             />
-            <Button variant="ghost" onClick={() => addCountry(input)} disabled={!input.trim()}>
-              +
-            </Button>
+            {input.trim() !== "" && matches.length > 0 && (
+              <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-border bg-surface shadow-soft">
+                {matches.map((m) => (
+                  <li key={m.code}>
+                    <button
+                      type="button"
+                      onClick={() => addCountry(m)}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                    >
+                      <span>{m.name}</span>
+                      <span className="text-[11px] text-muted">{m.code}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {countries.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {countries.map((c) => (
                 <span
-                  key={c}
+                  key={c.code}
                   className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-sm font-medium text-accent"
                 >
-                  {c}
-                  <button type="button" onClick={() => removeCountry(c)} aria-label={`remove ${c}`} className="hover:text-accent">
+                  {c.name}
+                  <button type="button" onClick={() => removeCountry(c.code)} aria-label={`remove ${c.name}`} className="hover:text-accent">
                     ×
                   </button>
                 </span>
