@@ -78,6 +78,13 @@ type LegQuote struct {
 	URL          string   `json:"url"` // real, route-prefilled deep-link
 	Alternatives []LegAlt `json:"alternatives,omitempty"`
 	FetchedAt    string   `json:"fetched_at,omitempty"`
+	// Chosen-fare detail, surfaced inline on the route (D3). Populated ONLY from
+	// the source that actually stated them — never invented; empty => "~estimate".
+	Operator string `json:"operator,omitempty"`
+	Depart   string `json:"depart,omitempty"`
+	Duration string `json:"duration,omitempty"`
+	Stops    string `json:"stops,omitempty"`
+	Baggage  string `json:"baggage,omitempty"`
 	// RequestedMode is the mode the user asked for when it was not available for
 	// this leg (e.g. a bus across a sea); Mode then holds the substitute used.
 	RequestedMode   string `json:"requested_mode,omitempty"`
@@ -209,6 +216,7 @@ func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []
 		url = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
 	}
 	alts := make([]LegAlt, 0, len(chain))
+	var chosenDetail LegAlt
 	for _, c := range chain {
 		d, err := p.conv.Convert(c.Price.Amount*payable, c.Price.Currency, cur)
 		if err != nil {
@@ -218,15 +226,21 @@ func (p *PricePlanner) legQuote(from, to string, q conn.TransportQuote, chain []
 		if link == "" {
 			link = pricefetch.DeepLink(from, to, string(q.Mode), p.tripDate, p.tripAdults)
 		}
-		alts = append(alts, LegAlt{
+		a := LegAlt{
 			Source: c.Source, Price: round2(d), URL: link, Chosen: eqFold(c.Source, q.Source),
 			Operator: c.Operator, Depart: c.Depart, Duration: c.Duration, Stops: c.Stops, Baggage: c.Baggage,
-		})
+		}
+		if a.Chosen {
+			chosenDetail = a
+		}
+		alts = append(alts, a)
 	}
 	return LegQuote{
 		From: from, To: to, Mode: string(q.Mode),
 		Price: round2(disp), Estimated: q.Estimated, Source: q.Source, SourceTier: string(tier),
 		URL: url, Alternatives: alts, FetchedAt: fetchedAtStr(q.FetchedAt),
+		Operator: chosenDetail.Operator, Depart: chosenDetail.Depart, Duration: chosenDetail.Duration,
+		Stops: chosenDetail.Stops, Baggage: chosenDetail.Baggage,
 	}
 }
 

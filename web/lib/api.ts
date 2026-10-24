@@ -246,6 +246,13 @@ export interface PlanLeg {
   fetched_at?: string;
   requested_mode?: string; // set when the requested mode was unavailable
   mode_unavailable?: boolean;
+  // Chosen-fare detail shown inline on the route (D3); only when the source
+  // stated it (else "~estimate").
+  operator?: string;
+  depart?: string;
+  duration?: string;
+  stops?: string;
+  baggage?: string;
 }
 
 export interface HotelLine {

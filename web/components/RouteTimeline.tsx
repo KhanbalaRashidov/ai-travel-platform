@@ -11,6 +11,15 @@ export interface TimelineLeg {
   modeValue?: string; // current override selection (for the per-leg selector)
   onModeChange?: (mode: string) => void;
   unavailableNote?: string; // shown when the requested mode wasn't available
+  // Chosen-fare detail (D3), shown inline under the leg when the source has it.
+  operator?: string;
+  depart?: string;
+  duration?: string;
+  stops?: string;
+  baggage?: string;
+  estimated?: boolean; // true => show the "~estimate" note instead of detail
+  estimateNote?: string; // localized "~approximate" label
+  baggageLabel?: string; // localized "baggage" label
 }
 
 export interface ModeOption {
@@ -107,6 +116,41 @@ export function RouteTimeline({
               )}
             </div>
           )}
+
+          {/* Chosen-fare detail inline (D3): operator/flight, time, duration,
+              stops, baggage — straight from the source, or "~estimate". */}
+          {i < legs.length &&
+            (() => {
+              const l = legs[i];
+              const bits: string[] = [];
+              if (l.operator) bits.push(l.operator);
+              if (l.depart) bits.push(l.depart);
+              if (l.duration) bits.push(l.duration);
+              if (l.stops) bits.push(l.stops);
+              const hasDetail = bits.length > 0 || !!l.baggage;
+              if (!hasDetail) {
+                return l.estimated && l.price ? (
+                  <div className="ml-4 pl-6 text-[11px] text-muted">{l.estimateNote ?? "~"}</div>
+                ) : null;
+              }
+              return (
+                <div className="ml-4 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[11px] text-muted">
+                  {bits.map((b, k) => (
+                    <span key={k}>
+                      {k > 0 && <span className="mr-2 text-border">·</span>}
+                      {b}
+                    </span>
+                  ))}
+                  {l.baggage && (
+                    <span className="text-muted/80">
+                      {bits.length > 0 && <span className="mr-2 text-border">·</span>}
+                      🧳 {l.baggageLabel ? `${l.baggageLabel}: ` : ""}
+                      {l.baggage}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
         </li>
       ))}
     </ol>

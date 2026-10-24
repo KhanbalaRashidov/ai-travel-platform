@@ -455,6 +455,14 @@ export default function PlanPage() {
         unavailableNote: l.mode_unavailable
           ? t("res.modeUnavailable", { m: t(`mode.${l.requested_mode}`) })
           : undefined,
+        operator: l.operator,
+        depart: l.depart,
+        duration: l.duration,
+        stops: l.stops,
+        baggage: l.baggage,
+        estimated: l.estimated,
+        estimateNote: t("res.estimatedLine"),
+        baggageLabel: t("res.baggage"),
       }))
     : [];
 
