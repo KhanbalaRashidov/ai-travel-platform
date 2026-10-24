@@ -16,6 +16,31 @@ export const COUNTRY_CODES = [
   "CH", "TW", "TJ", "TH", "TN", "TR", "TM", "UA", "AE", "GB", "US", "UY", "UZ", "VN",
 ];
 
+// Azerbaijani country names. Intl.DisplayNames often ships no "az" region data
+// (it then returns English), so for AZ we use this dictionary first (E9). Covers
+// every code in COUNTRY_CODES.
+const AZ_NAMES: Record<string, string> = {
+  AL: "Albaniya", AD: "Andorra", AM: "Ermənistan", AR: "Argentina", AU: "Avstraliya",
+  AT: "Avstriya", AZ: "Azərbaycan", BH: "Bəhreyn", BD: "Banqladeş", BY: "Belarus",
+  BE: "Belçika", BA: "Bosniya və Herseqovina", BR: "Braziliya", BG: "Bolqarıstan", KH: "Kamboca",
+  CA: "Kanada", CL: "Çili", CN: "Çin", CO: "Kolumbiya", CR: "Kosta-Rika", HR: "Xorvatiya",
+  CU: "Kuba", CY: "Kipr", CZ: "Çexiya", DK: "Danimarka", DO: "Dominikan Respublikası",
+  EC: "Ekvador", EG: "Misir", EE: "Estoniya", FI: "Finlandiya", FR: "Fransa", GE: "Gürcüstan",
+  DE: "Almaniya", GR: "Yunanıstan", GT: "Qvatemala", HK: "Honq-Konq", HU: "Macarıstan",
+  IS: "İslandiya", IN: "Hindistan", ID: "İndoneziya", IR: "İran", IQ: "İraq", IE: "İrlandiya",
+  IL: "İsrail", IT: "İtaliya", JP: "Yaponiya", JO: "İordaniya", KZ: "Qazaxıstan", KE: "Keniya",
+  KW: "Küveyt", KG: "Qırğızıstan", LA: "Laos", LV: "Latviya", LB: "Livan", LT: "Litva",
+  LU: "Lüksemburq", MO: "Makao", MY: "Malayziya", MV: "Maldiv adaları", MT: "Malta", MX: "Meksika",
+  MD: "Moldova", MC: "Monako", ME: "Monteneqro", MA: "Mərakeş", NP: "Nepal", NL: "Niderland",
+  NZ: "Yeni Zelandiya", MK: "Şimali Makedoniya", NO: "Norveç", OM: "Oman", PK: "Pakistan",
+  PA: "Panama", PE: "Peru", PH: "Filippin", PL: "Polşa", PT: "Portuqaliya", QA: "Qatar",
+  RO: "Rumıniya", RU: "Rusiya", SA: "Səudiyyə Ərəbistanı", RS: "Serbiya", SG: "Sinqapur",
+  SK: "Slovakiya", SI: "Sloveniya", ZA: "Cənubi Afrika", KR: "Cənubi Koreya", ES: "İspaniya",
+  LK: "Şri-Lanka", SE: "İsveç", CH: "İsveçrə", TW: "Tayvan", TJ: "Tacikistan", TH: "Tailand",
+  TN: "Tunis", TR: "Türkiyə", TM: "Türkmənistan", UA: "Ukrayna", AE: "Birləşmiş Ərəb Əmirlikləri",
+  GB: "Böyük Britaniya", US: "Amerika Birləşmiş Ştatları", UY: "Uruqvay", UZ: "Özbəkistan", VN: "Vyetnam",
+};
+
 // Map a UI locale to the BCP-47 tag Intl.DisplayNames uses.
 function intlLocale(locale: string): string {
   switch (locale) {
@@ -43,8 +68,11 @@ function displayNames(locale: string): Intl.DisplayNames | null {
   }
 }
 
-// countryName resolves a code to its name in the given locale (English fallback).
+// countryName resolves a code to its name in the given locale. For Azerbaijani
+// the local dictionary wins (Intl usually lacks "az" region data); otherwise
+// Intl.DisplayNames in the locale, then AZ dict / English, then the code (E9).
 export function countryName(code: string, locale: string): string {
+  if (intlLocale(locale) === "az" && AZ_NAMES[code]) return AZ_NAMES[code];
   const dn = displayNames(locale);
   try {
     const n = dn?.of(code);
@@ -52,6 +80,7 @@ export function countryName(code: string, locale: string): string {
   } catch {
     /* ignore */
   }
+  if (AZ_NAMES[code] && intlLocale(locale) === "az") return AZ_NAMES[code];
   try {
     const en = displayNames("en")?.of(code);
     if (en && en !== code) return en;

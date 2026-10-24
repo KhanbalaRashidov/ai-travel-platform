@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 export type Locale = "az" | "en" | "ru" | "tr";
-export const LOCALES: Locale[] = ["az", "en", "ru", "tr"];
+// Switcher order (E10): English first (also the default), then AZ, RU, TR.
+export const LOCALES: Locale[] = ["en", "az", "ru", "tr"];
 export const LOCALE_LABEL: Record<Locale, string> = {
   az: "AZ",
   en: "EN",
