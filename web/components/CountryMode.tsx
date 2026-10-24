@@ -8,7 +8,7 @@ import {
   searchPlaces,
   suggestDestinations,
 } from "../lib/api";
-import { canonicalName, CountryOption, searchCountries } from "../lib/countries";
+import { canonicalName, countryName, CountryOption, localizeCountry, searchCountries } from "../lib/countries";
 import { useI18n } from "../lib/i18n";
 import { Button } from "./ui";
 import { PinIcon, SparkIcon } from "./icons";
@@ -32,31 +32,31 @@ export function CountryMode({
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [countries, setCountries] = useState<CountryOption[]>([]);
+  // Store only ISO codes; the display name is always derived from the CURRENT
+  // locale (D20), so switching language re-labels chips/suggestions instantly.
+  const [codes, setCodes] = useState<string[]>([]);
   const [data, setData] = useState<DestinationSuggestions | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
 
-  const matches = searchCountries(input, locale, 8).filter(
-    (m) => !countries.some((c) => c.code === m.code)
-  );
+  const matches = searchCountries(input, locale, 8).filter((m) => !codes.includes(m.code));
 
   function addCountry(c: CountryOption) {
-    if (!countries.some((x) => x.code === c.code)) setCountries([...countries, c]);
+    if (!codes.includes(c.code)) setCodes([...codes, c.code]);
     setInput("");
   }
   function removeCountry(code: string) {
-    setCountries(countries.filter((c) => c.code !== code));
+    setCodes(codes.filter((c) => c !== code));
   }
 
   async function suggest() {
-    if (countries.length === 0 || loading) return;
+    if (codes.length === 0 || loading) return;
     setLoading(true);
     setErr(null);
     try {
       // Send canonical English names so the AI resolves them regardless of UI language.
-      setData(await suggestDestinations(countries.map((c) => canonicalName(c.code)), budget, currency, locale));
+      setData(await suggestDestinations(codes.map((c) => canonicalName(c)), budget, currency, locale));
     } catch (e) {
       setErr(e instanceof ApiError && (e.status === 503 || e.status === 429) ? t("ai.busy") : t("ai.error"));
     } finally {
@@ -131,24 +131,27 @@ export function CountryMode({
             )}
           </div>
 
-          {countries.length > 0 && (
+          {codes.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {countries.map((c) => (
-                <span
-                  key={c.code}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-sm font-medium text-accent"
-                >
-                  {c.name}
-                  <button type="button" onClick={() => removeCountry(c.code)} aria-label={`remove ${c.name}`} className="hover:text-accent">
-                    ×
-                  </button>
-                </span>
-              ))}
+              {codes.map((code) => {
+                const name = countryName(code, locale);
+                return (
+                  <span
+                    key={code}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-sm font-medium text-accent"
+                  >
+                    {name}
+                    <button type="button" onClick={() => removeCountry(code)} aria-label={`remove ${name}`} className="hover:text-accent">
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           )}
 
           <div className="mt-3">
-            <Button onClick={suggest} disabled={countries.length === 0 || loading}>
+            <Button onClick={suggest} disabled={codes.length === 0 || loading}>
               {loading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-fg/40 border-t-primary-fg" />
@@ -178,7 +181,7 @@ export function CountryMode({
 
               {data.countries.map((cs, i) => (
                 <div key={i}>
-                  <h4 className="mb-2 font-display text-sm font-bold">{cs.country}</h4>
+                  <h4 className="mb-2 font-display text-sm font-bold">{localizeCountry(cs.country, locale)}</h4>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {cs.cities.map((c, j) => {
                       const added = isSelected(c.city);

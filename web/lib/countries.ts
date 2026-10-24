@@ -100,3 +100,27 @@ export function searchCountries(query: string, locale: string, limit = 10): Coun
 export function canonicalName(code: string): string {
   return countryName(code, "en");
 }
+
+const ALL_LOCALES = ["az", "en", "ru", "tr"];
+
+// codeByName reverse-maps a country name (in any of the 4 UI languages, English,
+// or an ISO code) back to its code — so an AI panel heading can be re-localized
+// to the current UI language (D20). Returns "" when unknown.
+export function codeByName(name: string): string {
+  const n = norm(name);
+  if (!n) return "";
+  for (const code of COUNTRY_CODES) {
+    if (code.toLowerCase() === n) return code;
+    for (const loc of ALL_LOCALES) {
+      if (norm(countryName(code, loc)) === n) return code;
+    }
+  }
+  return "";
+}
+
+// localizeCountry returns `name` rendered in `locale` when it maps to a known
+// country, otherwise the original string (so unknown AI labels still show).
+export function localizeCountry(name: string, locale: string): string {
+  const code = codeByName(name);
+  return code ? countryName(code, locale) : name;
+}
