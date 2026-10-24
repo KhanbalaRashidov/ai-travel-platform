@@ -13,6 +13,7 @@ import {
   track,
 } from "../../lib/api";
 import { LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
+import { hotelSites } from "../../lib/links";
 import { AppShell } from "../../components/AppShell";
 import { Badge, Button, Card, Field, NumberInput, Select } from "../../components/ui";
 import { CityAutocomplete } from "../../components/CityAutocomplete";
@@ -851,6 +852,7 @@ export default function PlanPage() {
                   activityItems={activityItems}
                   food={foodItems}
                   foodTotal={foodVal}
+                  hotelSites={(c: string) => hotelSites(c, startDate || undefined, returnDate || undefined, adults)}
                   city={(name: string) => name}
                   currency={plan.currency}
                   fmt={fmt}

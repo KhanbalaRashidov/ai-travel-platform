@@ -1,6 +1,7 @@
 "use client";
 
 import { FoodLine, HotelLine, PlanLeg } from "../lib/api";
+import { SiteLink } from "../lib/links";
 
 // A source name mapped to a human label (real scrapers vs the labeled estimate).
 function sourceLabel(src: string): string {
@@ -88,6 +89,7 @@ export function CostBreakdown({
   activityItems,
   food,
   foodTotal = 0,
+  hotelSites,
   currency,
   labels,
   fmt,
@@ -95,6 +97,8 @@ export function CostBreakdown({
 }: {
   legs: PlanLeg[];
   hotels: HotelLine[];
+  // D5: pre-filled hotel-site links for side-by-side comparison (no fake prices).
+  hotelSites?: (city: string) => SiteLink[];
   activities: number;
   // D1: when present, the Activities section expands into one row per planned
   // place (city · name · free/~price · Maps), and its sum is the figure shown.
@@ -143,6 +147,27 @@ export function CostBreakdown({
               labels={labels}
               fmt={fmt}
             >
+              {l.alternatives && l.alternatives.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-3">
+                  {l.alternatives.map((a, j) => (
+                    <a
+                      key={j}
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={a.operator || a.source}
+                      className={
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] hover:border-primary/50 " +
+                        (a.chosen ? "border-success/40 bg-success/5 text-text" : "border-border text-muted")
+                      }
+                    >
+                      <span>{a.source}</span>
+                      <span className="font-semibold tabular-nums text-text">{fmt(a.price)} {currency}</span>
+                      {a.chosen && <span className="text-success">✓</span>}
+                    </a>
+                  ))}
+                </div>
+              )}
               {l.alternatives && l.alternatives.length > 0 && (
                 <ul className="mt-1 space-y-1 pl-3 text-xs text-muted">
                   {l.alternatives.map((a, j) => (
@@ -195,12 +220,20 @@ export function CostBreakdown({
               labels={labels}
               fmt={fmt}
             >
-              <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
-                {h.url && (
-                  <a href={h.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Booking ↗
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                {/* D5: compare hotel sites side-by-side; prefilled links only, no
+                    fabricated per-site prices (the nightly shown is the estimate). */}
+                {(hotelSites ? hotelSites(h.city) : h.url ? [{ name: "Booking", url: h.url }] : []).map((s, k) => (
+                  <a
+                    key={k}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-border px-2 py-0.5 text-muted hover:border-primary/50 hover:text-primary"
+                  >
+                    {s.name} ↗
                   </a>
-                )}
+                ))}
                 <a
                   href={hotelMapsLink(h.name ?? "", h.city)}
                   target="_blank"
