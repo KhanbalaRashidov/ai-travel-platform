@@ -27,7 +27,7 @@ export function CityPOIs({ city }: { city: string }) {
       setLoading(true);
       setErr(null);
       try {
-        setItems(await fetchPOIs(city, 8));
+        setItems(await fetchPOIs(city, 12));
       } catch (e) {
         setErr(e instanceof ApiError && e.status === 502 ? t("poi.none") : t("poi.error"));
       } finally {

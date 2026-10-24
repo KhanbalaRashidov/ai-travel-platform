@@ -73,8 +73,11 @@ type Roadmap struct {
 
 const roadmapSystem = "You are a budget, travel-loving planner building a LOCATION-BASED, day-by-day itinerary. " +
 	"You are given an ordered list of days, each already assigned to a city, plus each city's nights. " +
-	"For EACH given day number, fill 2–4 POIs (points of interest) to visit that day, in a sensible " +
-	"walking/visiting order grouped by proximity. For EACH city also give a warm 1–2 sentence summary and " +
+	"For EACH given day number, fill 3–4 POIs (points of interest) to visit that day. CRITICAL: GROUP BY " +
+	"PROXIMITY — put POIs that are in the same area/district/neighbourhood on the SAME day, and order them as a " +
+	"sensible walking route, so each day stays geographically compact and there is minimal back-and-forth. " +
+	"Give more POIs to cities with more nights and only the top must-see highlights to a 1-night city (most " +
+	"iconic first). For EACH city also give a warm 1–2 sentence summary and " +
 	"a best_season. Each POI: name, type (sight/museum/food/park/viewpoint/transfer), a short desc, " +
 	"free=true/false, and an APPROXIMATE price like \"~€15\" for paid ones (always prefix ~; free ones omit it). " +
 	"For EACH city also give food_per_day: an APPROXIMATE mid-range restaurant cost per person per day, " +
@@ -186,11 +189,17 @@ func mergeRoadmap(skeleton Roadmap, parsed Roadmap, coords map[string]LatLng) Ro
 	for _, c := range parsed.Cities {
 		cityInfo[strings.ToLower(strings.TrimSpace(c.City))] = info{c.Summary, c.BestSeason, c.FoodPerDay}
 	}
-	// All model POIs grouped by city (lower-cased).
+	// All model POIs grouped by city (lower-cased), plus the model's own per-day
+	// grouping kept in order — so when the model's day count matches the skeleton
+	// we honour its proximity grouping instead of re-slicing (D8).
 	poolByCity := map[string][]POI{}
+	modelDaysByCity := map[string][][]POI{}
 	for _, d := range parsed.Days {
 		key := strings.ToLower(strings.TrimSpace(d.City))
 		poolByCity[key] = append(poolByCity[key], d.POIs...)
+		if len(d.POIs) > 0 {
+			modelDaysByCity[key] = append(modelDaysByCity[key], d.POIs)
+		}
 	}
 
 	out := Roadmap{}
@@ -218,7 +227,14 @@ func mergeRoadmap(skeleton Roadmap, parsed Roadmap, coords map[string]LatLng) Ro
 	for _, d := range skeleton.Days {
 		key := strings.ToLower(strings.TrimSpace(d.City))
 		center, hasCenter := coords[key]
-		pois := sliceForDay(poolByCity[key], daysPerCity[key], cursor[key])
+		// Honour the model's proximity-grouped days when its day count matches the
+		// skeleton's; otherwise split the city's pool evenly (adjacency preserved).
+		var pois []POI
+		if md := modelDaysByCity[key]; len(md) == daysPerCity[key] && cursor[key] < len(md) {
+			pois = md[cursor[key]]
+		} else {
+			pois = sliceForDay(poolByCity[key], daysPerCity[key], cursor[key])
+		}
 		cursor[key]++
 		for j := range pois {
 			if pois[j].Lat == 0 && pois[j].Lng == 0 && hasCenter {
