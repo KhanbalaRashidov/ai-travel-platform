@@ -14,6 +14,7 @@
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black" />
   <img alt="Postgres" src="https://img.shields.io/badge/PostgreSQL-16-336791" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
+  <a href="https://kofe.al/@khanbalarashidov"><img alt="Support" src="https://img.shields.io/badge/Support-kofe.al-FF5E5B" /></a>
 </p>
 
 > No booking, no payment, no visa/legal advice — it plans and prices, you book where you like. Prices are real-source when a page is reachable, otherwise a clearly-labeled `~` estimate; the AI is never allowed to invent a price or a rating.
@@ -118,4 +119,4 @@ Migrations apply only to the local dev Docker Postgres — never point them at a
 
 ## Support
 
-If this project is useful to you, consider supporting its development — see [`.github/FUNDING.yml`](.github/FUNDING.yml) (maintainer: set your own funding link there).
+If this project saves you time, you can support it here: https://kofe.al/@khanbalarashidov
