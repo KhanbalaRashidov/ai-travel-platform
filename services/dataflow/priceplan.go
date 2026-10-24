@@ -40,6 +40,7 @@ var transportModes = []conn.TransportMode{conn.ModeFlight, conn.ModeTrain, conn.
 type HotelLine struct {
 	City      string  `json:"city"`
 	Stars     int     `json:"stars"`
+	Name      string  `json:"name,omitempty"` // real hotel name when a source has one
 	Nights    int     `json:"nights"`
 	Nightly   float64 `json:"nightly"` // display currency
 	Total     float64 `json:"total"`   // display currency
@@ -563,7 +564,7 @@ func (p *PricePlanner) Plan(ctx context.Context, tenantID string, req PlanReques
 		hotels = append(hotels, planner.PricedHotel{City: oi, Stars: h.Stars, Nights: nightsByCity[oi], Nightly: h.Nightly})
 		nightlyDisp, _ := p.conv.Convert(h.Nightly.Amount, h.Nightly.Currency, cur)
 		hotelLines = append(hotelLines, HotelLine{
-			City: city, Stars: h.Stars, Nights: nightsByCity[oi],
+			City: city, Stars: h.Stars, Name: h.Name, Nights: nightsByCity[oi],
 			Nightly: round2(nightlyDisp), Total: round2(nightlyDisp * float64(nightsByCity[oi])),
 			Estimated: h.Estimated, Source: h.Source, FetchedAt: fetchedAtStr(h.FetchedAt),
 			URL: pricefetch.HotelLink(city, req.StartDate, req.ReturnDate, req.Adults),

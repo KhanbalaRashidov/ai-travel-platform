@@ -846,7 +846,7 @@ export default function PlanPage() {
                   city={(name: string) => name}
                   currency={plan.currency}
                   fmt={fmt}
-                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen"), baggage: t("res.baggage"), free: t("res.free"), approx: t("res.approx"), maps: t("res.maps") }}
+                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen"), baggage: t("res.baggage"), free: t("res.free"), approx: t("res.approx"), maps: t("res.maps"), hotel: t("res.hotelWord") }}
                   catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities"), food: t("res.food") }}
                 />
                 {(plan.travelers ?? 1) > 1 && (
@@ -876,6 +876,7 @@ export default function PlanPage() {
                 onRefine={(s) => applyRefine(s)}
                 roadmap={roadmap}
                 onRoadmap={setRoadmap}
+                hotels={plan.hotel_lines ?? []}
               />
             </div>
           </section>

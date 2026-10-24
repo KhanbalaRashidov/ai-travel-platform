@@ -84,6 +84,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.hotels": "Otellər",
     "res.activities": "Aktivliklər",
     "res.food": "Yemək (təxmini)",
+    "res.hotelWord": "otel",
+    "res.perNight": "gecə",
     "res.total": "Cəmi",
     "res.disclaimer":
       "Qiymətlər mənbədən çəkilir; hər sətirdə mənbə + tarix. Mənbəsiz sətir “~ təxmini”. Rəsmi saytda təsdiq et.",
@@ -206,6 +208,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.hotels": "Hotels",
     "res.activities": "Activities",
     "res.food": "Food (approx.)",
+    "res.hotelWord": "hotel",
+    "res.perNight": "night",
     "res.total": "Total",
     "res.disclaimer":
       "Prices come from the sources shown per line (with date). Sourceless lines are marked “~ estimate”. Confirm on the provider site.",
@@ -328,6 +332,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.hotels": "Отели",
     "res.activities": "Активности",
     "res.food": "Еда (примерно)",
+    "res.hotelWord": "отель",
+    "res.perNight": "ночь",
     "res.total": "Итого",
     "res.disclaimer":
       "Цены берутся из источников, указанных построчно (с датой). Строки без источника — «~ оценка». Проверьте на сайте.",
@@ -450,6 +456,8 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.hotels": "Oteller",
     "res.activities": "Aktiviteler",
     "res.food": "Yemek (tahmini)",
+    "res.hotelWord": "otel",
+    "res.perNight": "gece",
     "res.total": "Toplam",
     "res.disclaimer":
       "Fiyatlar her satırda gösterilen kaynaktan gelir (tarihli). Kaynaksız satır “~ tahmini”. Resmi sitede doğrula.",

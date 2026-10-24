@@ -47,8 +47,11 @@ type TransportQuote struct {
 
 // HotelQuote is an indicative nightly price for a star tier in a city.
 type HotelQuote struct {
-	City       string `json:"city"`
-	Stars      int    `json:"stars"`
+	City  string `json:"city"`
+	Stars int    `json:"stars"`
+	// Name is a real hotel name ONLY when a source provided it; the estimator
+	// leaves it empty (no invented hotel names — the UI shows a star descriptor).
+	Name       string `json:"name,omitempty"`
 	Nightly    Money  `json:"nightly"`
 	DeepLink   string `json:"deep_link,omitempty"`
 	Provenance `json:"provenance"`

@@ -5,6 +5,7 @@ import {
   ApiError,
   chat as chatApi,
   EditState,
+  HotelLine,
   ItineraryBrief,
   refine as refineApi,
   roadmap as roadmapApi,
@@ -31,6 +32,7 @@ export function AIPanel({
   onRefine,
   roadmap,
   onRoadmap,
+  hotels,
 }: {
   brief: ItineraryBrief | null;
   refineState: EditState | null;
@@ -39,6 +41,8 @@ export function AIPanel({
   // itemize its activities (D1) and the food estimate (D4) stays in sync.
   roadmap: Roadmap | null;
   onRoadmap: (r: Roadmap | null) => void;
+  // Priced hotels, so each roadmap city can show its hotel + Booking + Maps (D2).
+  hotels?: HotelLine[];
 }) {
   const { t, locale } = useI18n();
   const [aiOff, setAiOff] = useState(false);
@@ -189,6 +193,7 @@ export function AIPanel({
             <RoadmapCards
               roadmap={itin}
               travelers={brief?.travelers ?? 1}
+              hotels={hotels}
               labels={{
                 day: (n) => t("res.day", { n }),
                 nights: (n) => t("res.nights", { n }),
@@ -198,6 +203,8 @@ export function AIPanel({
                 maps: t("res.maps"),
                 activitiesEst: t("res.activitiesEst"),
                 perPerson: t("res.perPerson"),
+                hotel: t("res.hotelWord"),
+                perNight: t("res.perNight"),
               }}
             />
           )}

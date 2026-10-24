@@ -1,6 +1,6 @@
 "use client";
 
-import { Roadmap } from "../lib/api";
+import { HotelLine, Roadmap } from "../lib/api";
 import { PinIcon } from "./icons";
 import { POIMap, POIPoint } from "./POIMap";
 import { CityPOIs } from "./CityPOIs";
@@ -9,6 +9,11 @@ import { CityPOIs } from "./CityPOIs";
 // place, never an empty search).
 function mapsLink(name: string, city: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + city)}`;
+}
+
+function hotelMapsLink(name: string, city: string): string {
+  const q = name ? `${name} ${city}` : `hotels in ${city}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
 
 // priceNum pulls the first number out of an approximate price string like
@@ -30,10 +35,12 @@ function round2(n: number): number {
 export function RoadmapCards({
   roadmap,
   travelers = 1,
+  hotels,
   labels,
 }: {
   roadmap: Roadmap;
   travelers?: number;
+  hotels?: HotelLine[];
   labels: {
     day: (n: number) => string;
     nights: (n: number) => string;
@@ -43,9 +50,12 @@ export function RoadmapCards({
     maps: string;
     activitiesEst: string;
     perPerson: string;
+    hotel: string;
+    perNight: string;
   };
 }) {
   const cityInfo = new Map(roadmap.cities.map((c) => [c.city.toLowerCase(), c]));
+  const hotelByCity = new Map((hotels ?? []).map((h) => [h.city.toLowerCase(), h]));
 
   // Per-person activities estimate = sum of listed POI prices (approximate).
   const perPersonActivities = round2(
@@ -102,6 +112,31 @@ export function RoadmapCards({
                     )}
                   </div>
                   {info.summary && <p className="mt-1 text-sm leading-relaxed text-muted">{info.summary}</p>}
+                  {(() => {
+                    const h = hotelByCity.get(d.city.toLowerCase());
+                    if (!h) return null;
+                    return (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border bg-surface-2/50 px-3 py-1.5 text-xs">
+                        <span className="font-medium text-text">🏨 {h.name || `${h.stars}★ ${labels.hotel}`}</span>
+                        <span className="text-muted">
+                          ~{h.nightly} / {labels.perNight}
+                        </span>
+                        {h.url && (
+                          <a href={h.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            Booking ↗
+                          </a>
+                        )}
+                        <a
+                          href={hotelMapsLink(h.name ?? "", h.city)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          📍 {labels.maps}
+                        </a>
+                      </div>
+                    );
+                  })()}
                   <CityPOIs city={info.city} />
                 </div>
               )}

@@ -13,6 +13,12 @@ function mapsLink(name: string, city: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + city)}`;
 }
 
+// hotelMapsLink opens a Maps search for the named hotel (or hotels in the city).
+function hotelMapsLink(name: string, city: string): string {
+  const q = name ? `${name} ${city}` : `hotels in ${city}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
 function asOf(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -107,6 +113,7 @@ export function CostBreakdown({
     free: string;
     approx: string;
     maps: string;
+    hotel: string;
   };
   catLabels: { transport: string; hotels: string; activities: string; food: string };
   fmt: (n: number) => string;
@@ -172,16 +179,38 @@ export function CostBreakdown({
           {hotels.map((h, i) => (
             <Row
               key={i}
-              left={`${h.city} · ${h.stars}★ · ${h.nights} × ${fmt(h.nightly)}`}
+              left={
+                <span className="min-w-0">
+                  <span className="font-medium">{h.name || `${h.stars}★ ${labels.hotel}`}</span>
+                  <span className="block text-xs text-muted">
+                    {h.city} · {h.nights} × {fmt(h.nightly)} {currency}
+                  </span>
+                </span>
+              }
               value={h.total}
               currency={currency}
               source={h.source}
               fetchedAt={h.fetched_at}
               estimated={h.estimated}
-              url={h.url}
               labels={labels}
               fmt={fmt}
-            />
+            >
+              <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
+                {h.url && (
+                  <a href={h.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    Booking ↗
+                  </a>
+                )}
+                <a
+                  href={hotelMapsLink(h.name ?? "", h.city)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  📍 {labels.maps}
+                </a>
+              </div>
+            </Row>
           ))}
         </ul>
       </details>

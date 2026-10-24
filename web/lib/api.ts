@@ -251,6 +251,7 @@ export interface PlanLeg {
 export interface HotelLine {
   city: string;
   stars: number;
+  name?: string; // real hotel name when a source has one (else star descriptor)
   nights: number;
   nightly: number;
   total: number;
