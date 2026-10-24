@@ -119,7 +119,12 @@ export function CountryMode({
                   <li key={m.code}>
                     <button
                       type="button"
-                      onClick={() => addCountry(m)}
+                      // Select on pointer-down so a re-render (input change /
+                      // blur) can't drop the pick between mousedown and click.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addCountry(m);
+                      }}
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
                     >
                       <span>{m.name}</span>

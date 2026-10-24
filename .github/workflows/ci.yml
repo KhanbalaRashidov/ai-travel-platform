@@ -28,6 +28,10 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci
+      # Unit/component tests (Vitest + Testing Library) — guards autocomplete
+      # selection (origin city) and other UI logic.
+      - name: test
+        run: npm test
       # Must pass with EMPTY NEXT_PUBLIC_* — guards the `new URL("")` crash that
       # broke the build at /_not-found when a Docker build arg arrived as "".
       - name: build (empty env)

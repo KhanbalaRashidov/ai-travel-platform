@@ -91,7 +91,15 @@ export function CityAutocomplete({
                 <button
                   type="button"
                   disabled={taken}
-                  onClick={() => pick(p)}
+                  // Commit the selection on pointer-DOWN (not click): a late
+                  // debounced search response or an input blur can re-render this
+                  // list and replace the button between mousedown and click, which
+                  // would otherwise swallow the selection. preventDefault keeps the
+                  // input focused. (Touch taps also dispatch mousedown.)
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (!taken) pick(p);
+                  }}
                   className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 disabled:opacity-40"
                 >
                   <span>
