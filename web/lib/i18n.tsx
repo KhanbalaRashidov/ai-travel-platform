@@ -83,6 +83,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.transport": "Nəqliyyat",
     "res.hotels": "Otellər",
     "res.activities": "Aktivliklər",
+    "res.food": "Yemək (təxmini)",
     "res.total": "Cəmi",
     "res.disclaimer":
       "Qiymətlər mənbədən çəkilir; hər sətirdə mənbə + tarix. Mənbəsiz sətir “~ təxmini”. Rəsmi saytda təsdiq et.",
@@ -204,6 +205,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.transport": "Transport",
     "res.hotels": "Hotels",
     "res.activities": "Activities",
+    "res.food": "Food (approx.)",
     "res.total": "Total",
     "res.disclaimer":
       "Prices come from the sources shown per line (with date). Sourceless lines are marked “~ estimate”. Confirm on the provider site.",
@@ -325,6 +327,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.transport": "Транспорт",
     "res.hotels": "Отели",
     "res.activities": "Активности",
+    "res.food": "Еда (примерно)",
     "res.total": "Итого",
     "res.disclaimer":
       "Цены берутся из источников, указанных построчно (с датой). Строки без источника — «~ оценка». Проверьте на сайте.",
@@ -446,6 +449,7 @@ const MESSAGES: Record<Locale, Dict> = {
     "res.transport": "Ulaşım",
     "res.hotels": "Oteller",
     "res.activities": "Aktiviteler",
+    "res.food": "Yemek (tahmini)",
     "res.total": "Toplam",
     "res.disclaimer":
       "Fiyatlar her satırda gösterilen kaynaktan gelir (tarihli). Kaynaksız satır “~ tahmini”. Resmi sitede doğrula.",

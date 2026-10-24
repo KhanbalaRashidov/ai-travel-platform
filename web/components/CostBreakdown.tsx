@@ -1,11 +1,16 @@
 "use client";
 
-import { HotelLine, PlanLeg } from "../lib/api";
+import { FoodLine, HotelLine, PlanLeg } from "../lib/api";
 
 // A source name mapped to a human label (real scrapers vs the labeled estimate).
 function sourceLabel(src: string): string {
   if (!src || src === "distance-estimate" || src === "seed") return "";
   return src;
+}
+
+// mapsLink opens the actual place on Google Maps (never an empty search).
+function mapsLink(name: string, city: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + city)}`;
 }
 
 function asOf(iso?: string): string {
@@ -74,6 +79,9 @@ export function CostBreakdown({
   legs,
   hotels,
   activities,
+  activityItems,
+  food,
+  foodTotal = 0,
   currency,
   labels,
   fmt,
@@ -82,9 +90,25 @@ export function CostBreakdown({
   legs: PlanLeg[];
   hotels: HotelLine[];
   activities: number;
+  // D1: when present, the Activities section expands into one row per planned
+  // place (city · name · free/~price · Maps), and its sum is the figure shown.
+  activityItems?: { city: string; name: string; free: boolean; price?: string }[];
+  // D4: approximate per-city restaurant spend ("~" labeled), its own category.
+  food?: FoodLine[];
+  foodTotal?: number;
+  city?: (name: string) => string;
   currency: string;
-  labels: { source: string; asOf: string; est: string; chosen: string; baggage: string };
-  catLabels: { transport: string; hotels: string; activities: string };
+  labels: {
+    source: string;
+    asOf: string;
+    est: string;
+    chosen: string;
+    baggage: string;
+    free: string;
+    approx: string;
+    maps: string;
+  };
+  catLabels: { transport: string; hotels: string; activities: string; food: string };
   fmt: (n: number) => string;
 }) {
   const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
@@ -167,18 +191,81 @@ export function CostBreakdown({
           <span>{catLabels.activities}</span>
           <span className="tabular-nums">{fmt(activities)} {currency}</span>
         </summary>
-        <ul className="mt-1">
-          <Row
-            left={catLabels.activities}
-            value={activities}
-            currency={currency}
-            source=""
-            estimated
-            labels={labels}
-            fmt={fmt}
-          />
-        </ul>
+        {activityItems && activityItems.length > 0 ? (
+          <>
+            <ul className="mt-1">
+              {activityItems.map((a, i) => (
+                <li
+                  key={i}
+                  className="flex items-center justify-between gap-2 border-t border-border/60 py-1.5 text-sm first:border-t-0"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="text-muted">{a.city} · </span>
+                    {a.name}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs">
+                    {a.free ? (
+                      <span className="font-medium text-success">{labels.free}</span>
+                    ) : (
+                      <span className="text-accent">{a.price || labels.approx}</span>
+                    )}
+                    <a
+                      href={mapsLink(a.name, a.city)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={labels.maps}
+                      className="text-primary hover:underline"
+                    >
+                      ↗
+                    </a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[11px] text-accent">{labels.est}</p>
+          </>
+        ) : (
+          <ul className="mt-1">
+            <Row
+              left={catLabels.activities}
+              value={activities}
+              currency={currency}
+              source=""
+              estimated
+              labels={labels}
+              fmt={fmt}
+            />
+          </ul>
+        )}
       </details>
+
+      {food && food.length > 0 && (
+        <details className={section}>
+          <summary className="flex items-center justify-between text-sm font-semibold">
+            <span>{catLabels.food}</span>
+            <span className="tabular-nums">~{fmt(foodTotal)} {currency}</span>
+          </summary>
+          <ul className="mt-1">
+            {food.map((f, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between gap-2 border-t border-border/60 py-1.5 text-sm first:border-t-0"
+              >
+                <span className="min-w-0 truncate">
+                  <span>{f.city}</span>
+                  <span className="ml-1 text-xs text-muted">
+                    · {f.nights} × ~{fmt(f.per_day)} {currency}
+                  </span>
+                </span>
+                <span className="shrink-0 tabular-nums text-sm">
+                  ~{fmt((f.total ?? f.per_day * f.nights))} {currency}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-accent">{labels.est}</p>
+        </details>
+      )}
     </div>
   );
 }

@@ -29,15 +29,21 @@ export function AIPanel({
   brief,
   refineState,
   onRefine,
+  roadmap,
+  onRoadmap,
 }: {
   brief: ItineraryBrief | null;
   refineState: EditState | null;
   onRefine: (state: EditState, changed: string[]) => void;
+  // The generated roadmap is lifted to the page so the live-cost panel can
+  // itemize its activities (D1) and the food estimate (D4) stays in sync.
+  roadmap: Roadmap | null;
+  onRoadmap: (r: Roadmap | null) => void;
 }) {
   const { t, locale } = useI18n();
   const [aiOff, setAiOff] = useState(false);
 
-  const [itin, setItin] = useState<Roadmap | null>(null);
+  const itin = roadmap;
   const [itinLoading, setItinLoading] = useState(false);
   const [itinErr, setItinErr] = useState<string | null>(null);
 
@@ -68,7 +74,7 @@ export function AIPanel({
     setItinErr(null);
     try {
       const nbc = brief.nights_by_city ?? [];
-      setItin(await roadmapApi(brief.cities, nbc, brief.places ?? [], locale));
+      onRoadmap(await roadmapApi(brief.cities, nbc, brief.places ?? [], locale));
     } catch (e) {
       if (!handledAsOff(e)) setItinErr(errMessage(e));
     } finally {

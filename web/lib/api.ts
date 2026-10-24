@@ -372,9 +372,19 @@ export interface RoadmapCity {
   lng?: number;
 }
 
+// FoodLine is an approximate per-city restaurant spend (D4): a mid-range daily
+// cost × nights, always "~"-labeled (model knowledge, not a quoted price).
+export interface FoodLine {
+  city: string;
+  per_day: number; // per person, approximate, EUR-normalized to display currency
+  nights: number;
+  total?: number;
+}
+
 export interface Roadmap {
   cities: RoadmapCity[];
   days: RoadmapDay[];
+  food?: FoodLine[];
 }
 
 export function roadmap(

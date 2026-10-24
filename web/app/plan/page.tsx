@@ -9,6 +9,7 @@ import {
   Place,
   planQuote,
   PlanQuote,
+  Roadmap,
   track,
 } from "../../lib/api";
 import { LOCALE_CURRENCY, useI18n } from "../../lib/i18n";
@@ -99,6 +100,7 @@ export default function PlanPage() {
   const [currency, setCurrency] = useState<string>(LOCALE_CURRENCY[locale]);
 
   const [plan, setPlan] = useState<PlanQuote | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -246,6 +248,7 @@ export default function PlanPage() {
     if (!start) setStart(p.name);
     setLegModes({});
     setPlan(null); // city-set change -> recompute manually
+    setRoadmap(null); // stale: the city set changed
   }
   function removePlace(name: string) {
     const next = places.filter((x) => x.name !== name);
@@ -253,6 +256,7 @@ export default function PlanPage() {
     if (start === name) setStart(next[0]?.name ?? "");
     setLegModes({});
     setPlan(null);
+    setRoadmap(null);
   }
 
   function base(order?: string[]): Pending {
@@ -401,6 +405,35 @@ export default function PlanPage() {
   }
 
   const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  // Activities (D1): when a roadmap exists, itemize its POIs (city · place ·
+  // free/~price · maps) and derive the activities figure from those lines
+  // instead of the flat per-night estimate — the sum comes from the rows.
+  const priceNum = (price?: string): number => {
+    if (!price) return 0;
+    const m = price.replace(",", ".").match(/\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : 0;
+  };
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const travelers = plan?.travelers ?? 1;
+  const activityItems = roadmap
+    ? roadmap.days.flatMap((d) =>
+        (d.pois ?? []).map((p) => ({ city: d.city, name: p.name, free: !!p.free, price: p.price }))
+      )
+    : [];
+  const perPersonActivities = round2(activityItems.reduce((a, p) => a + priceNum(p.price), 0));
+  // Food estimate (D4): per-city approximate restaurant spend from the roadmap.
+  const foodItems = roadmap?.food ?? [];
+  const perPersonFood = round2(foodItems.reduce((a, f) => a + (f.per_day || 0) * (f.nights || 0), 0));
+  const groupActivities = round2(perPersonActivities * Math.max(1, travelers));
+  const groupFood = round2(perPersonFood * Math.max(1, travelers));
+  // Coherent figures: when the roadmap is present the live cost and total use the
+  // itemized activities (+ food) sum; otherwise the backend per-night estimate.
+  const activitiesVal = roadmap ? groupActivities : plan?.activities ?? 0;
+  const foodVal = roadmap ? groupFood : 0;
+  const totalVal = plan ? round2(plan.transport + plan.hotels + activitiesVal + foodVal) : 0;
+  const perPersonVal = plan ? round2(totalVal / Math.max(1, travelers)) : 0;
+
   const variantTone = (v: string) => (v === "open_jaw" ? "accent" : "primary");
   const variantLabel = (v: string) => (v === "open_jaw" ? t("res.openjaw") : t("res.roundtrip"));
 
@@ -481,7 +514,10 @@ export default function PlanPage() {
     ? [
         { key: "transport", label: t("res.transport"), value: plan.transport, colorVar: "--transport" },
         { key: "hotels", label: t("res.hotels"), value: plan.hotels, colorVar: "--hotels" },
-        { key: "activities", label: t("res.activities"), value: plan.activities, colorVar: "--activities" },
+        { key: "activities", label: t("res.activities"), value: activitiesVal, colorVar: "--activities" },
+        ...(foodVal > 0
+          ? [{ key: "food", label: t("res.food"), value: foodVal, colorVar: "--accent" } as CostSegment]
+          : []),
       ]
     : [];
 
@@ -712,11 +748,11 @@ export default function PlanPage() {
                 <span>{(plan.hotel_lines ?? []).length} {t("plan.cities")}</span>
                 <span className="text-muted">·</span>
                 <span className="font-display text-lg font-bold">
-                  {fmt(plan.total)} {plan.currency}
+                  {fmt(totalVal)} {plan.currency}
                 </span>
-                {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
+                {(plan.travelers ?? 1) > 1 && (
                   <span className="text-muted">
-                    ({fmt(plan.per_person)} {plan.currency} / {t("res.perPerson")})
+                    ({fmt(perPersonVal)} {plan.currency} / {t("res.perPerson")})
                   </span>
                 )}
               </div>
@@ -798,22 +834,26 @@ export default function PlanPage() {
                   <h2 className="font-display text-lg font-bold">{t("res.liveCost")}</h2>
                 </div>
                 <div className="mt-5">
-                  <CostDonut segments={segments} total={plan.total} currency={plan.currency} fmt={fmt} />
+                  <CostDonut segments={segments} total={totalVal} currency={plan.currency} fmt={fmt} />
                 </div>
                 <CostBreakdown
                   legs={plan.legs ?? []}
                   hotels={plan.hotel_lines ?? []}
-                  activities={plan.activities}
+                  activities={activitiesVal}
+                  activityItems={activityItems}
+                  food={foodItems}
+                  foodTotal={foodVal}
+                  city={(name: string) => name}
                   currency={plan.currency}
                   fmt={fmt}
-                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen"), baggage: t("res.baggage") }}
-                  catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities") }}
+                  labels={{ source: t("res.source"), asOf: t("res.asOf"), est: t("res.estimatedLine"), chosen: t("res.chosen"), baggage: t("res.baggage"), free: t("res.free"), approx: t("res.approx"), maps: t("res.maps") }}
+                  catLabels={{ transport: t("res.transport"), hotels: t("res.hotels"), activities: t("res.activities"), food: t("res.food") }}
                 />
-                {typeof plan.per_person === "number" && (plan.travelers ?? 1) > 1 && (
+                {(plan.travelers ?? 1) > 1 && (
                   <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
                     <span className="text-muted">{t("res.perPerson")}</span>
                     <span className="font-semibold tabular-nums">
-                      {fmt(plan.per_person)} {plan.currency}
+                      {fmt(perPersonVal)} {plan.currency}
                     </span>
                   </div>
                 )}
@@ -830,7 +870,13 @@ export default function PlanPage() {
             </Card>
 
             <div className="print:hidden">
-              <AIPanel brief={aiBrief} refineState={refineState} onRefine={(s) => applyRefine(s)} />
+              <AIPanel
+                brief={aiBrief}
+                refineState={refineState}
+                onRefine={(s) => applyRefine(s)}
+                roadmap={roadmap}
+                onRoadmap={setRoadmap}
+              />
             </div>
           </section>
         )}
