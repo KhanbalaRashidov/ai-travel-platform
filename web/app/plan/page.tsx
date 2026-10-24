@@ -747,7 +747,7 @@ export default function PlanPage() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label={t("plan.depart")}>
               <NumberInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </Field>
@@ -764,7 +764,7 @@ export default function PlanPage() {
           </div>
           <p className="mt-1.5 text-xs text-muted">{t("plan.startHint")}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label={t("plan.comfort")}>
               <Select value={tier} onChange={(e) => changeTier(e.target.value as Tier)}>
                 <option value="budget">{t("tier.budget")}</option>

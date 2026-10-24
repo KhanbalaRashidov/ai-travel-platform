@@ -84,7 +84,9 @@ export function Badge({
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
+    // min-w-0 so the field can shrink inside a grid/flex row instead of forcing
+    // the track wider than its share (which made neighbors overlap).
+    <label className="block min-w-0">
       <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
         {label}
       </span>
@@ -93,8 +95,10 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+// min-w-0 lets the control shrink to its track — crucial for native date inputs,
+// whose intrinsic min-width otherwise overflows a narrow grid cell.
 const control =
-  "w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface";
+  "w-full min-w-0 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm text-text transition-colors hover:border-primary/40 focus:border-primary focus:bg-surface";
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   const { className, ...rest } = props;
