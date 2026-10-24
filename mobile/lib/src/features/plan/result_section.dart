@@ -5,7 +5,10 @@ import '../../api/models.dart';
 import '../../state/settings_controller.dart';
 import '../../widgets/common.dart';
 import 'plan_state.dart';
+import 'roadmap_state.dart';
 import 'widgets/cost_breakdown.dart';
+import 'widgets/roadmap_panel.dart';
+import 'widgets/route_map.dart';
 import 'widgets/route_timeline.dart';
 
 /// The computed plan. F3 shows the optimal order + headline totals; the route
@@ -18,6 +21,7 @@ class ResultSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(tProvider);
     final q = ref.watch(planControllerProvider.select((s) => s.quote));
+    final food = ref.watch(roadmapControllerProvider.select((s) => s.roadmap?.food));
 
     if (q == null) {
       return SectionCard(
@@ -55,7 +59,11 @@ class ResultSection extends ConsumerWidget {
         const SizedBox(height: 12),
         RouteTimeline(q: q),
         const SizedBox(height: 12),
-        CostBreakdown(q: q),
+        CostBreakdown(q: q, food: food),
+        const SizedBox(height: 12),
+        const RouteMap(),
+        const SizedBox(height: 12),
+        const RoadmapPanel(),
       ],
     );
   }
