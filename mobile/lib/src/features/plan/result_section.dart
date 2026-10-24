@@ -6,6 +6,7 @@ import '../../state/settings_controller.dart';
 import '../../widgets/common.dart';
 import 'plan_state.dart';
 import 'roadmap_state.dart';
+import 'share_export.dart';
 import 'widgets/cost_breakdown.dart';
 import 'widgets/roadmap_panel.dart';
 import 'widgets/route_map.dart';
@@ -21,7 +22,8 @@ class ResultSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(tProvider);
     final q = ref.watch(planControllerProvider.select((s) => s.quote));
-    final food = ref.watch(roadmapControllerProvider.select((s) => s.roadmap?.food));
+    final roadmap = ref.watch(roadmapControllerProvider.select((s) => s.roadmap));
+    final food = roadmap?.food;
 
     if (q == null) {
       return SectionCard(
@@ -55,6 +57,26 @@ class ResultSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => sharePlan(q, roadmap, t),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: Text(t('res.share')),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => printPlan(q, roadmap, t),
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: Text(t('res.print')),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         _OrderCard(q: q),
         const SizedBox(height: 12),
         RouteTimeline(q: q),

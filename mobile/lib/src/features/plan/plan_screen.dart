@@ -25,6 +25,16 @@ class PlanScreen extends ConsumerWidget {
     final state = ref.watch(planControllerProvider);
     final ctrl = ref.read(planControllerProvider.notifier);
 
+    // Toasts: route ready / updated / error.
+    ref.listen(planControllerProvider.select((s) => s.quote), (prev, next) {
+      if (next != null) {
+        showToast(context, t(prev == null ? 'toast.ready' : 'toast.updated'));
+      }
+    });
+    ref.listen(planControllerProvider.select((s) => s.error), (prev, next) {
+      if (next != null) showToast(context, t(next));
+    });
+
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/chat'),
