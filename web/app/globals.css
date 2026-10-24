@@ -117,6 +117,33 @@
   }
 }
 
+/* D15: print/PDF — keep city/day/transport blocks whole, force collapsed
+   <details> open, and print full link URLs inside the roadmap document. */
+@media print {
+  details,
+  details > summary ~ * {
+    display: block !important;
+  }
+  .print-block,
+  section,
+  li,
+  table,
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-doc {
+    color: #000;
+    font-size: 11pt;
+  }
+  .print-doc a[href]::after {
+    content: " (" attr(href) ")";
+    word-break: break-all;
+    font-size: 9pt;
+    color: #333;
+  }
+}
+
 @layer components {
   /* Ambient hero glow used behind the landing + wizard headers. */
   .aurora {

@@ -20,6 +20,7 @@ import { CityAutocomplete } from "../../components/CityAutocomplete";
 import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
 import { CostDonut, CostSegment } from "../../components/CostDonut";
 import { CostBreakdown } from "../../components/CostBreakdown";
+import { RoadmapPrint } from "../../components/RoadmapPrint";
 import { RouteMap, MapPoint } from "../../components/RouteMap";
 import { AIPanel } from "../../components/AIPanel";
 import { useToast } from "../../components/toast";
@@ -235,6 +236,17 @@ export default function PlanPage() {
   // Re-run the last attempted plan (error-state retry button).
   function retryPlan() {
     if (lastTry.current) setPending(lastTry.current);
+  }
+
+  // Print/PDF (D15): expand every collapsed <details> (so the cost sections'
+  // content is captured) and include the AI day-by-day roadmap, then print.
+  function printPlan() {
+    try {
+      document.querySelectorAll("details").forEach((d) => d.setAttribute("open", ""));
+    } catch {
+      /* ignore */
+    }
+    window.print();
   }
 
   useEffect(() => {
@@ -853,7 +865,7 @@ export default function PlanPage() {
               <Button variant="ghost" onClick={share}>
                 {copied ? t("res.copied") : t("res.share")}
               </Button>
-              <Button variant="ghost" onClick={() => window.print()}>
+              <Button variant="ghost" onClick={printPlan}>
                 {t("res.print")}
               </Button>
             </div>
@@ -962,6 +974,25 @@ export default function PlanPage() {
                 nightsFor={nightsFor}
               />
             </div>
+
+            {/* Print/PDF only: the AI day-by-day roadmap in a structured layout (D15). */}
+            {roadmap && roadmap.days.length > 0 && (
+              <RoadmapPrint
+                roadmap={roadmap}
+                legs={plan.legs ?? []}
+                hotels={plan.hotel_lines ?? []}
+                activities={activitiesVal}
+                food={foodItems}
+                foodTotal={foodVal}
+                transport={plan.transport}
+                hotelsTotal={plan.hotels}
+                total={totalVal}
+                perPerson={perPersonVal}
+                travelers={travelers}
+                currency={plan.currency}
+                fmt={fmt}
+              />
+            )}
           </section>
         )}
       </main>
