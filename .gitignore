@@ -5,6 +5,11 @@ keys/
 *.pem
 *.key
 
+# deploy — the owner installs/edits the reverse proxy on the server by hand;
+# the nginx config (and any real env) must never be committed.
+deploy/nginx/
+*.env.real
+
 # go
 /bin/
 *.exe

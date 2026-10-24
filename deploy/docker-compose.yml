@@ -1,5 +1,14 @@
-# Local dev stack: Postgres + Redis + Go API + Next.js web.
-# Usage: docker compose -f deploy/docker-compose.yml up -d
+# Deploy stack: Postgres + Redis + Go API + Next.js web.
+#
+# Run from the repo root so the root .env drives port interpolation:
+#   docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+#
+# All host port bindings are loopback-only (127.0.0.1): nothing is exposed
+# publicly by Docker. A reverse proxy (nginx, installed by hand on the server —
+# intentionally NOT in this repo) terminates TLS and proxies the public domain to
+# these local ports. Postgres and Redis are NOT published to the host at all
+# (internal docker network only), so they never clash with a Postgres already
+# running on the server's 5432. Ports are env-driven — see .env.example.
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,8 +16,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: ai_travel
-    ports:
-      - "5432:5432"
+    # Internal only by default — no host port (reached as postgres:5432 on the
+    # docker network). To expose it for inspection, set POSTGRES_PORT in .env and
+    # uncomment the mapping below (loopback by default, e.g. 5433 to avoid 5432):
+    # ports:
+    #   - "${BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,8 +31,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Internal only — no host port (reached as redis:6379 on the docker network).
 
   api:
     build:
@@ -29,19 +40,23 @@ services:
     # Load the repo-root .env directly into the container (path is relative to
     # this compose file: deploy/ -> ../.env). required: false means a missing
     # .env is not an error. This carries secrets like ANTHROPIC_API_KEY without
-    # ${...} interpolation (which would warn), so `docker compose up -d` works
-    # on its own — no --env-file needed.
+    # ${...} interpolation (which would warn), so the stack works on its own.
     env_file:
       - path: ../.env
         required: false
     environment:
+      # The container ALWAYS listens on 8080 internally (this overrides any
+      # API_PORT coming from .env via env_file). The host-published port below is
+      # what varies between hosts.
       API_PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/ai_travel?sslmode=disable
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: dev-insecure-change-me
       JWT_TTL_HOURS: "72"
+    # Host publish. Loopback by default (nginx proxies the public /api/ here); set
+    # BIND_HOST=0.0.0.0 for direct LAN access during development.
     ports:
-      - "0.0.0.0:8080:8080"
+      - "${BIND_HOST:-127.0.0.1}:${API_PORT:-8090}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,14 +67,20 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
-    # No hardcoded API URL: the browser derives it from the page host, so the
-    # same image works on localhost AND over the LAN (a phone opening
-    # http://<lan-ip>:3000 calls http://<lan-ip>:8080). To force a fixed API,
-    # set NEXT_PUBLIC_API_BASE_URL here (it is inlined at build time).
-    # environment:
-    #   NEXT_PUBLIC_API_BASE_URL: http://your-host:8080/api/v1
+      args:
+        # NEXT_PUBLIC_* are inlined into the web bundle at BUILD time. Empty (the
+        # default) means the browser derives the API base from the page host at
+        # runtime (D11 LAN fallback). For production behind nginx set
+        # NEXT_PUBLIC_API_BASE=same-origin so the browser calls /api/v1 on the
+        # same origin (https://your-domain/api/v1), which nginx proxies to the API.
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        NEXT_PUBLIC_API_PORT: ${NEXT_PUBLIC_API_PORT:-}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+    # Host publish. Loopback by default (nginx proxies the public site here); set
+    # BIND_HOST=0.0.0.0 for direct LAN access during development.
     ports:
-      - "0.0.0.0:3000:3000"
+      - "${BIND_HOST:-127.0.0.1}:${WEB_PORT:-3100}:3000"
     depends_on:
       - api
 

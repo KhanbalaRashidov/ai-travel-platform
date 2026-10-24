@@ -1,12 +1,31 @@
 // Typed client for the plan endpoints. The API base is resolved at RUNTIME so
-// the same build works locally and over a LAN (D11): an explicit
-// NEXT_PUBLIC_API_BASE_URL wins; otherwise, in the browser, it is built from the
-// page's own host (so a phone opening http://<lan-ip>:3000 calls
-// http://<lan-ip>:8080) — never a hardcoded "localhost". SSR/build falls back to
-// localhost, but all real requests run client-side.
+// the same build works locally, over a LAN (D11) and behind a reverse proxy in
+// production, in this precedence:
+//   1. NEXT_PUBLIC_API_BASE_URL — an explicit, fixed, absolute URL (pin). Wins.
+//   2. NEXT_PUBLIC_API_BASE=same-origin — production behind nginx: the browser
+//      calls /api/v1 on the page's OWN origin (no custom port), so
+//      https://host/api/v1 is proxied to the API. A full URL here is also honored.
+//   3. LAN fallback: built from the page's own host + API port (so a phone
+//      opening http://<lan-ip>:3000 calls http://<lan-ip>:8080) — never a
+//      hardcoded "localhost".
+// SSR/build falls back to localhost (relative for same-origin), but all real
+// requests run client-side.
 function apiBase(): string {
-  const env = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (env && env.trim() !== "") return env;
+  const pinned = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (pinned && pinned.trim() !== "") return pinned;
+
+  const mode = (process.env.NEXT_PUBLIC_API_BASE || "").trim();
+  if (mode !== "") {
+    if (mode.toLowerCase() === "same-origin") {
+      if (typeof window !== "undefined" && window.location?.origin) {
+        return `${window.location.origin}/api/v1`;
+      }
+      return "/api/v1"; // SSR: relative (real calls happen client-side)
+    }
+    const base = mode.replace(/\/+$/, "");
+    return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+  }
+
   if (typeof window !== "undefined" && window.location?.hostname) {
     const port = process.env.NEXT_PUBLIC_API_PORT || "8080";
     return `${window.location.protocol}//${window.location.hostname}:${port}/api/v1`;

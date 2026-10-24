@@ -43,10 +43,10 @@
 
 ```bash
 cp .env.example .env            # fill values (all optional to boot)
-docker compose -f deploy/docker-compose.yml up -d   # Postgres + Redis + api + web
+docker compose --env-file .env -f deploy/docker-compose.yml up -d   # Postgres + Redis + api + web
 ```
 
-That's it — open **http://localhost:3000**. The API applies its embedded DB migrations automatically on boot (idempotent, fail-fast); no `make`/`psql` step. Health: `GET http://localhost:8080/health` · readiness: `GET /ready`.
+That's it — open **http://localhost:3100** (host ports are env-driven: web `WEB_PORT=3100`, api `API_PORT=8090`, both bound to `BIND_HOST=127.0.0.1` by default; Postgres/Redis stay internal). The API applies its embedded DB migrations automatically on boot (idempotent, fail-fast); no `make`/`psql` step. Health: `GET http://localhost:8090/health` · readiness: `GET /ready`. For a public server deploy behind nginx, see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 Run pieces locally instead:
 
@@ -78,6 +78,8 @@ All settings live in the environment — see [`.env.example`](.env.example) for 
 | `PRICE_SOURCES` | real-price sources (`name \| tos-note \| url-template`); empty = labeled estimates |
 | `DATABASE_URL` / `REDIS_URL` | datastores (local dev Docker by default) |
 | `CORS_ORIGINS` | browser allowlist (`*` in dev) |
+| `BIND_HOST` / `API_PORT` / `WEB_PORT` | host bind (default `127.0.0.1`) + loopback host ports (api `8090`, web `3100`); nginx fronts them in prod. `BIND_HOST=0.0.0.0` for direct LAN |
+| `NEXT_PUBLIC_API_BASE` | `same-origin` behind a reverse proxy (browser calls `/api/v1` on the page origin); empty = LAN auto-derive |
 | `NEXT_PUBLIC_API_BASE_URL` | empty = auto-derive from page host (LAN); set to pin a fixed API URL |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | optional run-summary notifications; skipped silently when unset |
 
@@ -85,10 +87,11 @@ Secrets go in `.env` only (gitignored) — never commit keys. Real prices are th
 
 ## Access on your network (LAN)
 
-The web app resolves the API from the page's own host at runtime (no hardcoded `localhost`), the gateway binds `0.0.0.0:8080`, the web binds `0.0.0.0:3000`, and CORS defaults to `*` — so a phone/tablet on the same Wi-Fi works after `up -d`:
+The web app resolves the API from the page's own host at runtime (no hardcoded `localhost`), and CORS defaults to `*`. Host ports bind to `127.0.0.1` by default (so a server deploy stays private behind nginx); for direct LAN access during development, publish them on all interfaces with `BIND_HOST=0.0.0.0`:
 
-1. Find the host's LAN IP — macOS `ipconfig getifaddr en0`, Linux `hostname -I | awk '{print $1}'`, Windows `ipconfig` → "IPv4 Address".
-2. On the other device (same Wi-Fi), open `http://<lan-ip>:3000`; it calls the API at `http://<lan-ip>:8080` automatically.
+1. In `.env` set `BIND_HOST=0.0.0.0` and bring the stack up.
+2. Find the host's LAN IP — macOS `ipconfig getifaddr en0`, Linux `hostname -I | awk '{print $1}'`, Windows `ipconfig` → "IPv4 Address".
+3. On the other device (same Wi-Fi), open `http://<lan-ip>:3100`; it calls the API at `http://<lan-ip>:8090` automatically (the web picks up `NEXT_PUBLIC_API_PORT`).
 
 To pin a fixed API, set `NEXT_PUBLIC_API_BASE_URL`; to restrict CORS, set `CORS_ORIGINS`. The LAN IP is not a secret.
 
