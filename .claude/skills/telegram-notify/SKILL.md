@@ -1,38 +1,39 @@
 ---
 name: telegram-notify
-description: Hər task/epic tamamlananda (commit+push+Trello-dan SONRA) həmin iş dövrünün TAM hesabatını — chat-da verilən eyni üslub və məzmunla, qısaldılmamış — mövcud Node.js Telegram bridge ilə Telegram-a göndər.
+description: Optional — after a task/epic is committed and pushed, post that cycle's full summary to Telegram when (and only when) Telegram env vars are configured. If they are not set, skip silently.
 ---
 
-# telegram-notify
+# telegram-notify (optional)
 
-Hər iş dövrünün (task/epic) sonunda görülən işin **tam hesabatını** Telegram-a göndər. Yeni bot/token yaratma — **mövcud bridge**-i təkrar işlət.
+Post the full summary of a finished work cycle to Telegram. This is **optional
+convenience tooling** — it is never required to build, run, or contribute to the
+project, and it must degrade to a no-op when not configured.
 
-## Nə vaxt
-Bir epic/task tamamlanıb **commit + push + Trello kartı Done**-a keçiriləndən SONRA. Yəni iş dövrü bitən kimi, son addım kimi.
+## Configuration (env only — no secrets in the repo)
+Set these in your local `.env` (gitignored) or CI secrets:
 
-## Mesajın məzmunu
-Chat-da istifadəçiyə verdiyin **eyni tam hesabat**, olduğu kimi (qısaltma YOX):
-- `<Epic> icra olundu ✅ və push edildi`
-- `Commit:` hash + yoxlama (gofmt / vet / test nəticələri)
-- `Nə quruldu` bölməsi (bullet-lar)
-- `Trello → Done` kartları
-- varsa `🎓 növbəti kapsul` (AZ izah + interview EN termin/cümlə)
-- `Növbəti addım`
+- `TELEGRAM_BOT_TOKEN` — a bot token from @BotFather.
+- `TELEGRAM_CHAT_ID` — the chat/channel id to post to.
 
-## Necə göndərilir
-Bridge: `C:\Users\XANBALA\Desktop\telegram-claude-bot` (polling bot + `send.js` outbound CLI).
-`send.js` həmin layihənin MÖVCUD `.env`-ini oxuyur (`TELEGRAM_BOT_TOKEN` + `ALLOWED_CHAT_IDS`) — token burada **saxlanmır/təkrarlanmır**. Mətn stdin-dən verilir, >4096 olsa ~3800-lik bütöv-sətir hissələrə bölünüb "(1/N)" başlığı ilə ardıcıl göndərilir (truncate yox), plain text.
+If either is empty, notifications are **skipped silently**. Tokens live only in
+the environment; never hardcode or commit them.
 
-Addımlar:
-1. Hesabat mətnini bir fayla yaz (məs. scratchpad-də `report.txt`).
-2. Göndər:
-   ```bash
-   node "C:\Users\XANBALA\Desktop\telegram-claude-bot\send.js" < report.txt
-   ```
-   (və ya `echo "..." | node ".../send.js"`).
-3. `send: delivered N message(s)` çıxışını yoxla; uğursuzsa xətanı istifadəçiyə bildir.
+## When
+As the last step after a cycle's work is committed and pushed — an extra
+notification, not a replacement for commit/push.
 
-## Qaydalar
-- Token/chat_id yalnız bridge-in `.env`-indən gəlir; kodda hardcode yox, yeni secret yaratma.
-- `send.js` bridge layihəsinə aiddir (ayrı repo) — onu commit etmə. Travel repo-da yalnız bu SKILL.md commit olunur.
-- Bu bildiriş commit/push/Trello-nu ƏVƏZ ETMİR — onlardan sonra əlavə addımdır.
+## Message content
+The same full summary you would report to the user (no truncation): what was
+built (bullets), commit hash + checks (build/test), and the next step.
+
+## How to send
+Use any minimal sender that reads the token/chat from the environment and posts
+`stdin` as the message text (chunking anything over Telegram's 4096-char limit
+on whole-line boundaries). For example, a small Node or shell helper that calls
+`https://api.telegram.org/bot<token>/sendMessage`. The sender is not part of this
+repository; wire your own, or leave the env vars unset to disable.
+
+## Rules
+- Token/chat id come only from the environment; never commit a secret or a
+  personal path/account.
+- Notifications are optional and must no-op when unconfigured.
