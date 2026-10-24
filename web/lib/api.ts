@@ -445,6 +445,39 @@ export function refine(message: string, state: EditState): Promise<RefineResult>
   return postJSON("/ai/refine", { message, state });
 }
 
+// --- country mode (D12): AI city suggestions per country + optional budget ----
+
+export interface SuggestedCity {
+  city: string;
+  country: string;
+  reason?: string;
+  best_season?: string;
+  // Ratings only ever present from a real source (none wired -> absent).
+  rating?: number;
+  review_count?: number;
+  review_summary?: string;
+}
+
+export interface CountrySuggestion {
+  country: string;
+  cities: SuggestedCity[];
+}
+
+export interface DestinationSuggestions {
+  countries: CountrySuggestion[];
+  budget_advice?: string;
+}
+
+export function suggestDestinations(
+  countries: string[],
+  budget_eur: number,
+  currency: string,
+  locale = "en"
+): Promise<DestinationSuggestions> {
+  const body = { countries, budget_eur: budget_eur || undefined, currency, locale };
+  return cached("dest:" + JSON.stringify(body), () => postJSON("/ai/destinations", body));
+}
+
 export function sequence(
   matrix: number[][],
   start: number,

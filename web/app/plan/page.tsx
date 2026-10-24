@@ -17,6 +17,7 @@ import { hotelSites, skyscannerFlightLink } from "../../lib/links";
 import { AppShell } from "../../components/AppShell";
 import { Badge, Button, Card, Field, NumberInput, Select } from "../../components/ui";
 import { CityAutocomplete } from "../../components/CityAutocomplete";
+import { CountryMode } from "../../components/CountryMode";
 import { RouteTimeline, TimelineLeg } from "../../components/RouteTimeline";
 import { CostDonut, CostSegment } from "../../components/CostDonut";
 import { CostBreakdown } from "../../components/CostBreakdown";
@@ -629,6 +630,14 @@ export default function PlanPage() {
               />
             </Field>
           </div>
+
+          {/* D12: country mode — type a country, let the AI suggest cities. */}
+          <CountryMode
+            budget={budget}
+            currency={currency}
+            isSelected={(name) => places.some((p) => p.name.toLowerCase() === name.toLowerCase())}
+            onAddCity={addPlace}
+          />
 
           <div className="mt-4" />
           <Field label={t("plan.cities")}>

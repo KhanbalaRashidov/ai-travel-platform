@@ -165,6 +165,35 @@ func (h *AIHandler) Roadmap(c *fiber.Ctx) error {
 // round2 rounds to 2 decimals.
 func round2(f float64) float64 { return float64(int64(f*100+0.5)) / 100 }
 
+type destinationsReq struct {
+	Countries []string `json:"countries"`
+	BudgetEUR float64  `json:"budget_eur"`
+	Currency  string   `json:"currency"`
+	Locale    string   `json:"locale"`
+}
+
+// Destinations handles POST /ai/destinations — country mode (D12): given one or
+// more countries (+ optional budget), return AI-ranked city suggestions per
+// country (reason + best season) and optional budget guidance. Ratings are never
+// invented (stripped in the AI layer). 503 when AI is not configured.
+func (h *AIHandler) Destinations(c *fiber.Ctx) error {
+	if h.bulk == nil {
+		return httpx.Err(c, fiber.StatusServiceUnavailable, "AI not configured")
+	}
+	var req destinationsReq
+	if err := c.BodyParser(&req); err != nil || len(req.Countries) == 0 {
+		return httpx.Err(c, fiber.StatusBadRequest, "countries are required")
+	}
+	res, err := ai.SuggestCountryDestinations(c.Context(), h.bulk, req.Countries, req.BudgetEUR, req.Currency, langName(req.Locale))
+	if err != nil {
+		if ai.IsTransient(err) {
+			return httpx.Err(c, fiber.StatusServiceUnavailable, busyMsg)
+		}
+		return httpx.Err(c, fiber.StatusBadGateway, "could not suggest destinations")
+	}
+	return httpx.OK(c, res)
+}
+
 type chatReq struct {
 	Message string `json:"message"`
 	Locale  string `json:"locale"`
