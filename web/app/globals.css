@@ -91,6 +91,8 @@
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* D11: never let a wide child cause horizontal page scroll on phones. */
+    overflow-x: hidden;
   }
   ::selection {
     background-color: rgb(var(--primary) / 0.22);

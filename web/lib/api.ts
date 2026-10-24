@@ -1,8 +1,18 @@
-// Typed client for the plan endpoints. The API base comes from the environment
-// so the same build works against local dev and deployed backends.
-
-const BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
+// Typed client for the plan endpoints. The API base is resolved at RUNTIME so
+// the same build works locally and over a LAN (D11): an explicit
+// NEXT_PUBLIC_API_BASE_URL wins; otherwise, in the browser, it is built from the
+// page's own host (so a phone opening http://<lan-ip>:3000 calls
+// http://<lan-ip>:8080) — never a hardcoded "localhost". SSR/build falls back to
+// localhost, but all real requests run client-side.
+function apiBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (env && env.trim() !== "") return env;
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const port = process.env.NEXT_PUBLIC_API_PORT || "8080";
+    return `${window.location.protocol}//${window.location.hostname}:${port}/api/v1`;
+  }
+  return "http://localhost:8080/api/v1";
+}
 
 export interface Money {
   amount: number;
@@ -98,7 +108,7 @@ async function withTimeout(url: string, init: RequestInit): Promise<Response> {
 }
 
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
-  const res = await withTimeout(`${BASE}${path}`, {
+  const res = await withTimeout(`${apiBase()}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -107,7 +117,7 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await withTimeout(`${BASE}${path}`, {});
+  const res = await withTimeout(`${apiBase()}${path}`, {});
   return parseEnvelope<T>(res);
 }
 
@@ -207,7 +217,7 @@ export function fetchPOIs(city: string, limit = 8): Promise<POIItem[]> {
 // track records a privacy-safe aggregate event (fire-and-forget, never throws).
 export function track(name: string): void {
   try {
-    void fetch(`${BASE}/analytics/event`, {
+    void fetch(`${apiBase()}/analytics/event`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),

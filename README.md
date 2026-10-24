@@ -28,6 +28,26 @@ cd web && npm install && npm run dev
 
 Health: `GET http://localhost:8080/health` · Readiness (db+redis): `GET /ready`
 
+### Open it from another device on the same Wi‑Fi (LAN)
+The web app resolves the API from the **page's own host** at runtime (no hardcoded
+`localhost`), the gateway binds `0.0.0.0:8080`, the web binds `0.0.0.0:3000`, and
+CORS defaults to `*` — so a phone/tablet on the same Wi‑Fi can use it with no extra
+config after `up -d`:
+
+1. Find the host machine's LAN IP:
+   - macOS: `ipconfig getifaddr en0` (or `en1` on Wi‑Fi)
+   - Linux: `hostname -I | awk '{print $1}'`
+   - Windows: `ipconfig` → "IPv4 Address"
+2. On the other device (same Wi‑Fi), open `http://<lan-ip>:3000`.
+   The browser automatically calls the API at `http://<lan-ip>:8080`.
+
+Notes:
+- To pin a fixed API URL instead, set `NEXT_PUBLIC_API_BASE_URL` (inlined at build);
+  a custom API port can be set with `NEXT_PUBLIC_API_PORT` (default `8080`).
+- To restrict CORS, set `CORS_ORIGINS` (comma-separated) in `.env`.
+- The LAN IP is not a secret; real secrets stay in the gitignored `.env`.
+- Running locally (not Docker): `cd web && npm run dev` already binds `0.0.0.0`.
+
 ### AI (Groq by default, free — or Gemini / Claude)
 Put the key in the **repo-root `.env`** (gitignored) and bring the stack up — nothing else. Default provider is **Groq** (free, OpenAI-compatible):
 ```bash
