@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../features/chat/chat_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/plan/plan_screen.dart';
 
@@ -18,6 +19,11 @@ final appRouter = GoRouter(
       path: '/plan',
       name: 'plan',
       builder: (context, state) => const PlanScreen(),
+    ),
+    GoRoute(
+      path: '/chat',
+      name: 'chat',
+      builder: (context, state) => const ChatScreen(),
     ),
   ],
 );

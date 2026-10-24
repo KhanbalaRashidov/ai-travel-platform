@@ -26,6 +26,11 @@ class PlanScreen extends ConsumerWidget {
     final ctrl = ref.read(planControllerProvider.notifier);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/chat'),
+        icon: const Icon(Icons.auto_awesome, size: 18),
+        label: Text(t('ai.title')),
+      ),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
