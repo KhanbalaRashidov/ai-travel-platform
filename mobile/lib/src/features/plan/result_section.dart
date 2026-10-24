@@ -6,6 +6,7 @@ import '../../state/settings_controller.dart';
 import '../../widgets/common.dart';
 import '../../widgets/money.dart';
 import 'plan_state.dart';
+import 'widgets/route_timeline.dart';
 
 /// The computed plan. F3 shows the optimal order + headline totals; the route
 /// timeline, detailed live cost, AI roadmap, map, chat and export are layered in
@@ -51,6 +52,8 @@ class ResultSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _OrderCard(q: q),
+        const SizedBox(height: 12),
+        RouteTimeline(q: q),
         const SizedBox(height: 12),
         _TotalsCard(q: q),
       ],
