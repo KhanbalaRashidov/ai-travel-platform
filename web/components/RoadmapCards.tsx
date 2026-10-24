@@ -1,6 +1,7 @@
 "use client";
 
-import { HotelLine, Roadmap } from "../lib/api";
+import { useState } from "react";
+import { fetchPOIs, HotelLine, POIItem, Roadmap } from "../lib/api";
 import { PinIcon } from "./icons";
 import { POIMap, POIPoint } from "./POIMap";
 import { CityPOIs } from "./CityPOIs";
@@ -38,11 +39,15 @@ export function RoadmapCards({
   hotels,
   onNights,
   nightsFor,
+  onEdit,
   labels,
 }: {
   roadmap: Roadmap;
   travelers?: number;
   hotels?: HotelLine[];
+  // D18: edit the roadmap — remove / add / swap an activity. The page recomputes
+  // the activities cost + total from the edited roadmap.
+  onEdit?: (r: Roadmap) => void;
   // D9: editable per-city nights, synced with the D7 list. Editing re-plans; the
   // "Regenerate" button then rebuilds the roadmap with the new nights.
   onNights?: (city: string, n: number) => void;
@@ -59,10 +64,70 @@ export function RoadmapCards({
     hotel: string;
     perNight: string;
     regenHint: string;
+    remove: string;
+    otherPlaces: string;
+    loadingPlaces: string;
+    noMore: string;
   };
 }) {
   const cityInfo = new Map(roadmap.cities.map((c) => [c.city.toLowerCase(), c]));
   const hotelByCity = new Map((hotels ?? []).map((h) => [h.city.toLowerCase(), h]));
+
+  // --- editing (D18): remove / add / swap activities -------------------------
+  const [pickFor, setPickFor] = useState<number | null>(null);
+  const [altCache, setAltCache] = useState<Record<string, POIItem[]>>({});
+  const [altLoading, setAltLoading] = useState(false);
+
+  function updateDay(dayIndex: number, pois: Roadmap["days"][number]["pois"]) {
+    if (!onEdit) return;
+    onEdit({ ...roadmap, days: roadmap.days.map((d, i) => (i === dayIndex ? { ...d, pois } : d)) });
+  }
+  function removePOI(dayIndex: number, poiIndex: number) {
+    updateDay(dayIndex, (roadmap.days[dayIndex].pois ?? []).filter((_, j) => j !== poiIndex));
+  }
+  function addPOI(dayIndex: number, item: POIItem) {
+    updateDay(dayIndex, [
+      ...(roadmap.days[dayIndex].pois ?? []),
+      {
+        name: item.name,
+        type: item.category,
+        desc: item.desc,
+        free: !!item.free,
+        price: item.price,
+        lat: item.lat,
+        lng: item.lng,
+      },
+    ]);
+  }
+  // Names already in a city's roadmap (across its days) — so alternatives exclude them.
+  function cityNames(city: string): Set<string> {
+    const s = new Set<string>();
+    for (const d of roadmap.days) {
+      if (d.city.toLowerCase() === city.toLowerCase()) {
+        for (const p of d.pois ?? []) s.add(p.name.toLowerCase());
+      }
+    }
+    return s;
+  }
+  async function openPicker(dayIndex: number, city: string) {
+    if (pickFor === dayIndex) {
+      setPickFor(null);
+      return;
+    }
+    setPickFor(dayIndex);
+    const key = city.toLowerCase();
+    if (!altCache[key]) {
+      setAltLoading(true);
+      try {
+        const items = await fetchPOIs(city, 16);
+        setAltCache((c) => ({ ...c, [key]: items }));
+      } catch {
+        setAltCache((c) => ({ ...c, [key]: [] }));
+      } finally {
+        setAltLoading(false);
+      }
+    }
+  }
 
   // Per-person activities estimate = sum of listed POI prices (approximate).
   const perPersonActivities = round2(
@@ -223,7 +288,7 @@ export function RoadmapCards({
                             {p.desc && <span className="block text-xs leading-snug text-muted">{p.desc}</span>}
                           </span>
                         </span>
-                        <span className="shrink-0 text-xs">
+                        <span className="flex shrink-0 items-center gap-1.5 text-xs">
                           {p.free ? (
                             <span className="rounded-full bg-success/10 px-2 py-0.5 font-medium text-success">
                               {labels.free}
@@ -231,10 +296,65 @@ export function RoadmapCards({
                           ) : (
                             <span className="text-accent">{p.price || labels.approx}</span>
                           )}
+                          {onEdit && (
+                            <button
+                              type="button"
+                              onClick={() => removePOI(i, j)}
+                              aria-label={labels.remove}
+                              title={labels.remove}
+                              className="text-muted/60 hover:text-danger"
+                            >
+                              ×
+                            </button>
+                          )}
                         </span>
                       </li>
                     ))}
                   </ol>
+                )}
+
+                {/* D18: add / swap an activity from the city's other places. */}
+                {onEdit && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => openPicker(i, d.city)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      {pickFor === i ? "▾" : "+"} {labels.otherPlaces}
+                    </button>
+                    {pickFor === i && (
+                      <div className="mt-2">
+                        {altLoading && !altCache[d.city.toLowerCase()] ? (
+                          <p className="text-xs text-muted">{labels.loadingPlaces}</p>
+                        ) : (
+                          (() => {
+                            const used = cityNames(d.city);
+                            const alts = (altCache[d.city.toLowerCase()] ?? []).filter(
+                              (a) => !used.has(a.name.toLowerCase())
+                            );
+                            if (alts.length === 0) return <p className="text-xs text-muted">{labels.noMore}</p>;
+                            return (
+                              <div className="flex flex-wrap gap-1.5">
+                                {alts.slice(0, 12).map((a, k) => (
+                                  <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => addPOI(i, a)}
+                                    className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] hover:border-primary/50 hover:text-primary"
+                                    title={a.desc || a.category}
+                                  >
+                                    + {a.name}
+                                    {!a.free && a.price ? <span className="text-accent">{a.price}</span> : null}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

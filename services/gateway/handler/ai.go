@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/KhanbalaRashidov/ai-travel-platform/pkg/httpx"
 	"github.com/KhanbalaRashidov/ai-travel-platform/services/ai"
+	conn "github.com/KhanbalaRashidov/ai-travel-platform/services/connectors"
 )
 
 // busyMsg is returned when the provider is momentarily overloaded/rate-limited
@@ -25,6 +27,7 @@ type AIHandler struct {
 	primary ai.LLM // reasoning (chat + edit parsing)
 	bulk    ai.LLM // cheap formatting (itinerary)
 	conv    currencyConverter
+	poi     poiSource
 	tools   []ai.Tool
 }
 
@@ -35,11 +38,17 @@ type currencyConverter interface {
 	Convert(amount float64, from, to string) (float64, error)
 }
 
+// poiSource fetches open-data POIs for a city (poi.Overpass satisfies it); used
+// to backfill roadmap days so none is left empty (D18). May be nil.
+type poiSource interface {
+	POIs(ctx context.Context, city string, limit int) ([]conn.POI, error)
+}
+
 // NewAIHandler wires the handler. Pass nil LLMs when the key is not configured;
 // tools (planner/flywheel) are attached to the chat orchestrator. conv may be nil
-// (food estimates then stay in EUR).
-func NewAIHandler(primary, bulk ai.LLM, conv currencyConverter, tools ...ai.Tool) *AIHandler {
-	return &AIHandler{primary: primary, bulk: bulk, conv: conv, tools: tools}
+// (food estimates then stay in EUR); poi may be nil (no OSM day backfill).
+func NewAIHandler(primary, bulk ai.LLM, conv currencyConverter, poi poiSource, tools ...ai.Tool) *AIHandler {
+	return &AIHandler{primary: primary, bulk: bulk, conv: conv, poi: poi, tools: tools}
 }
 
 // Enabled reports whether the AI features are configured.
@@ -159,7 +168,58 @@ func (h *AIHandler) Roadmap(c *fiber.Ctx) error {
 			}
 		}
 	}
+
+	// D18: ensure NO day is left empty — backfill each city's POI pool from OSM +
+	// AI knowledge, then redistribute across its days. This runs separately from
+	// the plan's fast path (no P0 deadline), so it may be slower but fills fully.
+	res = h.fillRoadmapDays(c.Context(), res, coords, langName(req.Locale))
 	return httpx.OK(c, res)
+}
+
+// fillRoadmapDays tops up every city's POIs (OSM first, then AI) so each day in
+// the roadmap gets its share — no empty day cards (D18). Deduped, coordinates
+// filled from the city centre; prices stay approximate, ratings never invented.
+func (h *AIHandler) fillRoadmapDays(ctx context.Context, r ai.Roadmap, coords map[string]ai.LatLng, lang string) ai.Roadmap {
+	dayCount := map[string]int{}
+	cityName := map[string]string{}
+	for _, d := range r.Days {
+		k := strings.ToLower(strings.TrimSpace(d.City))
+		dayCount[k]++
+		if cityName[k] == "" {
+			cityName[k] = d.City
+		}
+	}
+	if len(dayCount) == 0 {
+		return r
+	}
+	extra := make(map[string][]ai.POI, len(dayCount))
+	for k, days := range dayCount {
+		name := cityName[k]
+		need := days * 4 // aim for up to 4 POIs/day
+		var pool []ai.POI
+		if h.poi != nil {
+			if ps, err := h.poi.POIs(ctx, name, need); err == nil {
+				for _, p := range ps {
+					pool = append(pool, ai.POI{
+						Name: p.Name, Type: p.Category, Desc: p.Desc,
+						Free: p.Free, Price: strings.TrimSpace(p.Price), Lat: p.Lat, Lng: p.Lng,
+					})
+				}
+			}
+		}
+		if len(pool) < need && h.bulk != nil {
+			if infos, err := ai.PopularPOIs(ctx, h.bulk, name, lang, need); err == nil {
+				for _, in := range infos {
+					pool = append(pool, ai.POI{
+						Name: in.Name, Type: in.Category, Desc: in.Desc,
+						Free: in.Free, Price: strings.TrimSpace(in.Price),
+					})
+				}
+			}
+		}
+		extra[k] = pool
+	}
+	return ai.RebalanceDays(r, extra, coords, 4)
 }
 
 // round2 rounds to 2 decimals.

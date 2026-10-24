@@ -202,6 +202,7 @@ export function AIPanel({
               hotels={hotels}
               onNights={onCityNights}
               nightsFor={nightsFor}
+              onEdit={onRoadmap}
               labels={{
                 day: (n) => t("res.day", { n }),
                 nights: (n) => t("res.nights", { n }),
@@ -214,6 +215,10 @@ export function AIPanel({
                 hotel: t("res.hotelWord"),
                 perNight: t("res.perNight"),
                 regenHint: t("ai.itin.regenHint"),
+                remove: t("roadmap.remove"),
+                otherPlaces: t("roadmap.otherPlaces"),
+                loadingPlaces: t("roadmap.loadingPlaces"),
+                noMore: t("roadmap.noMore"),
               }}
             />
           )}

@@ -69,6 +69,37 @@ func TestStructuredRoadmap_DistributesPOIsAndKeepsSkeleton(t *testing.T) {
 	}
 }
 
+// D18: after backfill, no day may be left empty.
+func TestRebalanceDays_FillsEveryDay(t *testing.T) {
+	// 3 days in one city but the model only gave 2 POIs on day 1.
+	r := Roadmap{
+		Cities: []CityInfo{{City: "Tbilisi", Nights: 3}},
+		Days: []DayPlan{
+			{Day: 1, City: "Tbilisi", POIs: []POI{{Name: "Narikala"}, {Name: "Old Town"}}},
+			{Day: 2, City: "Tbilisi"},
+			{Day: 3, City: "Tbilisi"},
+		},
+	}
+	extra := map[string][]POI{
+		"tbilisi": {{Name: "Sulphur Baths"}, {Name: "Mtatsminda"}, {Name: "Narikala"} /*dup*/, {Name: "Rustaveli Ave"}},
+	}
+	coords := map[string]LatLng{"tbilisi": {Lat: 41.7151, Lng: 44.8271}}
+	out := RebalanceDays(r, extra, coords, 4)
+	if len(out.Days) != 3 {
+		t.Fatalf("expected 3 days, got %d", len(out.Days))
+	}
+	for i, d := range out.Days {
+		if len(d.POIs) == 0 {
+			t.Fatalf("day %d is empty after rebalance: %+v", i+1, out.Days)
+		}
+		for _, p := range d.POIs {
+			if p.Lat == 0 || p.Lng == 0 {
+				t.Fatalf("POI coord not filled from centre: %+v", p)
+			}
+		}
+	}
+}
+
 func TestStructuredRoadmap_FallsBackToSkeletonOnLLMError(t *testing.T) {
 	llm := &MockLLM{Script: nil} // exhausted -> error
 	r, err := StructuredRoadmap(context.Background(), llm, []string{"Baku", "Tbilisi"}, []int{0, 2}, nil, "English")

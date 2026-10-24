@@ -246,6 +246,73 @@ func mergeRoadmap(skeleton Roadmap, parsed Roadmap, coords map[string]LatLng) Ro
 	return out
 }
 
+// RebalanceDays redistributes POIs so NO day is left empty (D18). For each city
+// it pools the POIs already on its days plus `extra` (OSM/AI backfill), dedupes
+// by name, caps at days×maxPerDay, and spreads them evenly across that city's
+// days (so every day gets its share). Missing POI coordinates fall back to the
+// city centre. City cards, day numbering and food are preserved.
+func RebalanceDays(r Roadmap, extra map[string][]POI, coords map[string]LatLng, maxPerDay int) Roadmap {
+	lc := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
+	type pool struct {
+		items []POI
+		seen  map[string]bool
+	}
+	pools := map[string]*pool{}
+	dayCount := map[string]int{}
+	add := func(k string, ps []POI) {
+		p := pools[k]
+		if p == nil {
+			p = &pool{seen: map[string]bool{}}
+			pools[k] = p
+		}
+		for _, poi := range ps {
+			key := lc(poi.Name)
+			if poi.Name == "" || p.seen[key] {
+				continue
+			}
+			p.seen[key] = true
+			p.items = append(p.items, poi)
+		}
+	}
+	// Existing POIs first (preserve the model's proximity ordering), then extras.
+	for _, d := range r.Days {
+		k := lc(d.City)
+		add(k, d.POIs)
+		dayCount[k]++
+	}
+	for k, list := range extra {
+		if pools[lc(k)] != nil || dayCount[lc(k)] > 0 {
+			add(lc(k), list)
+		}
+	}
+	// Cap each city's pool so days stay reasonable (days × maxPerDay).
+	if maxPerDay > 0 {
+		for k, p := range pools {
+			if cap := dayCount[k] * maxPerDay; cap > 0 && len(p.items) > cap {
+				p.items = p.items[:cap]
+			}
+		}
+	}
+	out := Roadmap{Cities: r.Cities, Food: r.Food}
+	cursor := map[string]int{}
+	for _, d := range r.Days {
+		k := lc(d.City)
+		var items []POI
+		if p := pools[k]; p != nil {
+			items = sliceForDay(p.items, dayCount[k], cursor[k])
+		}
+		cursor[k]++
+		center, has := coords[k]
+		for j := range items {
+			if items[j].Lat == 0 && items[j].Lng == 0 && has {
+				items[j].Lat, items[j].Lng = center.Lat, center.Lng
+			}
+		}
+		out.Days = append(out.Days, DayPlan{Day: d.Day, City: d.City, Title: d.Title, POIs: items})
+	}
+	return out
+}
+
 // sliceForDay returns the share of a city's POI pool for its dayIndex-th day,
 // splitting the pool as evenly as possible across totalDays days.
 func sliceForDay(pool []POI, totalDays, dayIndex int) []POI {
