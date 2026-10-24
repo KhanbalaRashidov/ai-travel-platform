@@ -1,0 +1,92 @@
+name: ai_travel
+description: "AI Travel Platform — advisory-only, cost-optimal multi-country trip planner (mobile client)."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+# The app is a thin client: all routing / pricing / roadmap logic stays on the Go
+# gateway. No secrets ship in the app — the API base is injected at build time via
+# --dart-define=API_BASE=... (see README). Versions are pinned for reproducibility.
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.7.0
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Models (immutable data classes + JSON)
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # Persistence (remembered locale / theme)
+  shared_preferences: ^2.3.3
+
+  # Open external booking / source / maps links
+  url_launcher: ^6.3.1
+
+  # Map (OpenStreetMap, no API key)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Markdown chat rendering (no raw "**")
+  flutter_markdown: ^0.7.4+1
+
+  # Cost donut chart
+  fl_chart: ^0.69.2
+
+  # Share + PDF / print
+  share_plus: ^10.1.2
+  printing: ^5.13.4
+  pdf: ^3.11.1
+
+  # Localized formatting helpers
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.3
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/
+
+# App launcher icon (brand gradient mark). Drop a 1024x1024 PNG at the path below
+# (generate it from assets/icon/app_icon.svg) then run:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0A0E24"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+# Splash screen in brand colors. Works with just the background color; an optional
+# centered image is used when present. Run:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0A0E24"
+  color_dark: "#0A0E24"
+  image: assets/icon/app_icon.png
+  image_dark: assets/icon/app_icon.png
+  android_12:
+    color: "#0A0E24"
+    color_dark: "#0A0E24"
+    image: assets/icon/app_icon.png
+    image_dark: assets/icon/app_icon.png
