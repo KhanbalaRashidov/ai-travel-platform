@@ -35,7 +35,20 @@ export function Markdown({ children }: { children: string }) {
           p: ({ children }) => <p className="my-1 first:mt-0 last:mb-0">{children}</p>,
           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
           code: ({ children }) => (
-            <code className="rounded bg-surface px-1 py-0.5 text-[0.8em] text-text">{children}</code>
+            <code className="rounded bg-surface px-1 py-0.5 text-[0.8em] text-text [overflow-wrap:anywhere]">{children}</code>
+          ),
+          // Fenced code never forces the bubble wide: it wraps and, if still too
+          // long, scrolls inside its own box.
+          pre: ({ children }) => (
+            <pre className="my-1 max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-surface p-2 text-xs">
+              {children}
+            </pre>
+          ),
+          // GFM tables scroll inside their own container instead of overflowing.
+          table: ({ children }) => (
+            <div className="my-1 max-w-full overflow-x-auto">
+              <table className="w-full text-xs">{children}</table>
+            </div>
           ),
           blockquote: ({ children }) => (
             <blockquote className="my-1 border-l-2 border-border pl-2 text-muted">{children}</blockquote>
