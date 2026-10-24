@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+
+  web:
+    name: web build (empty + full NEXT_PUBLIC_*)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      # Must pass with EMPTY NEXT_PUBLIC_* — guards the `new URL("")` crash that
+      # broke the build at /_not-found when a Docker build arg arrived as "".
+      - name: build (empty env)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_URL: ""
+          NEXT_PUBLIC_API_BASE: ""
+          NEXT_PUBLIC_API_BASE_URL: ""
+          NEXT_PUBLIC_API_PORT: ""
+      # And with production values (same-origin behind nginx + a real site URL).
+      - name: build (full env)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_URL: "https://travel.myalfasoft.com"
+          NEXT_PUBLIC_API_BASE: "same-origin"
+          NEXT_PUBLIC_API_BASE_URL: ""
+          NEXT_PUBLIC_API_PORT: "8090"

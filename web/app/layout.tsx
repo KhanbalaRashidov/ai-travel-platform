@@ -4,6 +4,7 @@ import "./globals.css";
 import { LocaleProvider } from "../lib/i18n";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ToastProvider } from "../components/toast";
+import { siteUrl, siteUrlObject } from "../lib/site";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext", "cyrillic"],
@@ -17,10 +18,10 @@ const sora = Sora({
   display: "swap",
 });
 
-const siteURL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteURL = siteUrl();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteURL),
+  metadataBase: siteUrlObject(),
   title: "AI Travel Platform — cost-optimal trip roadmaps",
   description:
     "Cost-optimal multi-country trip roadmaps: cheapest route, hotels by tier, day-by-day plan and a live total. Advisory only.",
