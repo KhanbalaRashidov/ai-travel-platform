@@ -22,3 +22,6 @@ npm-debug.log*
 .idea/
 .vscode/
 *.log
+
+# Owner-only design/learning journal — not part of the open-source repo.
+LEARNING_PROGRESS.md
