@@ -627,33 +627,6 @@ export default function PlanPage() {
                   <span className="text-primary/50">⠿</span>
                   <PinIcon width={13} height={13} />
                   {p.name}
-                  {/* Per-city nights stepper (C8). */}
-                  <span
-                    className="ml-1 inline-flex items-center gap-1 rounded-full bg-surface px-1 py-0.5"
-                    title={t("plan.nightsHint")}
-                    draggable={false}
-                    onDragStart={(e) => e.preventDefault()}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => changeCityNights(p.name, nightsFor(p.name) - 1)}
-                      aria-label={`fewer nights in ${p.name}`}
-                      className="grid h-4 w-4 place-items-center rounded-full text-primary/70 hover:bg-primary/10 hover:text-primary"
-                    >
-                      −
-                    </button>
-                    <span className="min-w-[2.2rem] text-center text-xs tabular-nums text-text">
-                      {t("res.nights", { n: nightsFor(p.name) })}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => changeCityNights(p.name, nightsFor(p.name) + 1)}
-                      aria-label={`more nights in ${p.name}`}
-                      className="grid h-4 w-4 place-items-center rounded-full text-primary/70 hover:bg-primary/10 hover:text-primary"
-                    >
-                      +
-                    </button>
-                  </span>
                   <button
                     type="button"
                     onClick={() => removePlace(p.name)}
@@ -664,6 +637,72 @@ export default function PlanPage() {
                   </button>
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* D7: a clearly visible, editable per-city nights list — each row has
+              a drag-handle to reorder, the city, and a −N+ stepper + typed
+              number. Changing re-prices the plan + roadmap + POIs live. When a
+              city has no explicit nights, the AI/date-allocated value is shown. */}
+          {places.length > 0 && (
+            <div className="mt-4 rounded-xl border border-border bg-surface-2/50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  {t("plan.nightsTitle")}
+                </span>
+                <span className="text-[11px] text-muted">{t("plan.nightsHint")}</span>
+              </div>
+              <ul className="space-y-1.5">
+                {places.map((p, i) => (
+                  <li
+                    key={p.name}
+                    draggable
+                    onDragStart={() => setDragIdx(i)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (dragIdx !== null) reorderDest(dragIdx, i);
+                      setDragIdx(null);
+                    }}
+                    className="flex cursor-grab items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5 active:cursor-grabbing"
+                    title={t("plan.dragHint")}
+                  >
+                    <span className="text-muted/50">⠿</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
+                    {cityNights[p.name] == null && (
+                      <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                        {t("plan.aiNights")}
+                      </span>
+                    )}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => changeCityNights(p.name, nightsFor(p.name) - 1)}
+                        aria-label={`fewer nights in ${p.name}`}
+                        className="grid h-6 w-6 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-primary/40 hover:text-text"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        value={nightsFor(p.name)}
+                        onChange={(e) => changeCityNights(p.name, Math.max(1, Number(e.target.value) || 1))}
+                        aria-label={`nights in ${p.name}`}
+                        className="w-12 rounded-lg border border-border bg-surface-2 px-1 py-0.5 text-center text-sm tabular-nums outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => changeCityNights(p.name, nightsFor(p.name) + 1)}
+                        aria-label={`more nights in ${p.name}`}
+                        className="grid h-6 w-6 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-primary/40 hover:text-text"
+                      >
+                        +
+                      </button>
+                      <span className="w-10 text-right text-[11px] text-muted">{t("res.nights", { n: nightsFor(p.name) })}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
