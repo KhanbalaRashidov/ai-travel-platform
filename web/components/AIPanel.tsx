@@ -15,6 +15,7 @@ import { useI18n } from "../lib/i18n";
 import { Button, Card } from "./ui";
 import { SparkIcon } from "./icons";
 import { RoadmapCards } from "./RoadmapCards";
+import { Markdown } from "./Markdown";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -232,16 +233,17 @@ export function AIPanel({
           )}
           {messages.map((m, i) => (
             <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-              <span
+              <div
                 className={
-                  "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm " +
+                  "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm " +
                   (m.role === "user"
-                    ? "bg-primary text-primary-fg"
+                    ? "whitespace-pre-wrap bg-primary text-primary-fg"
                     : "border border-border bg-surface-2 text-text")
                 }
               >
-                {m.text}
-              </span>
+                {/* Assistant replies render as safe markdown (D10); user text stays literal. */}
+                {m.role === "assistant" ? <Markdown>{m.text}</Markdown> : m.text}
+              </div>
             </div>
           ))}
           {chatLoading && (
